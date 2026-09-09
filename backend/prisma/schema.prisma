@@ -1,0 +1,315 @@
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  CUSTOMER
+  ADMIN
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  SHIPPING
+  DELIVERED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  COD
+  CARD
+  VNPAY
+  MOMO
+}
+
+enum PaymentStatus {
+  UNPAID
+  PAID
+  REFUNDED
+}
+
+model User {
+  id              String      @id @default(uuid())
+  fullName        String      @map("full_name")
+  phoneNumber     String      @unique @map("phone_number")
+  email           String      @unique
+  passwordHash    String      @map("password_hash")
+  role            Role        @default(CUSTOMER)
+  avatar          String?     @db.VarChar(500)
+  stylePreference String?     @default("minimal") @map("style_preference")
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+
+  addresses       Address[]
+  orders          Order[]
+  reviews         Review[]
+  cart            Cart?
+  wishlist        Wishlist?
+
+  @@map("users")
+}
+
+model Address {
+  id           String   @id @default(uuid())
+  userId       String   @map("user_id")
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  receiverName String   @map("receiver_name")
+  phone        String
+  street       String
+  ward         String
+  district     String
+  city         String
+  isDefault    Boolean  @default(false) @map("is_default")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("addresses")
+}
+
+model Category {
+  id          String    @id @default(uuid())
+  slug        String    @unique
+  name        String
+  description String?   @db.Text
+  image       String?   @db.VarChar(500)
+  type        String?   @default("standard") // quick, mega, standard
+  parentId    String?   @map("parent_id")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  products    Product[]
+
+  @@map("categories")
+}
+
+model Product {
+  id            String         @id // e.g. p001, p002 or uuid
+  slug          String         @unique
+  name          String
+  description   String?        @db.Text
+  price         Int
+  originalPrice Int?           @map("original_price")
+  gender        String         @default("unisex") // men, women, unisex
+  categoryId    String?        @map("category_id")
+  category      Category?      @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  categorySlug  String?        @map("category_slug")
+  styles        Json?          // Array of style tags: ["minimal", "basic"]
+  badge         String?        // NEW, BEST SELLER, SALE
+  rating        Float?         @default(5.0)
+  reviewCount   Int            @default(0) @map("review_count")
+  images        Json?          // Array of image paths
+  sizes         Json?          // Array of sizes: ["S", "M", "L", "XL"]
+  colors        Json?          // Array of color names: ["Trắng", "Đen"]
+  stockQuantity Int            @default(100) @map("stock_quantity")
+  isFeatured    Boolean        @default(false) @map("is_featured")
+  isTrending    Boolean        @default(false) @map("is_trending")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  outfitItems   OutfitProduct[]
+  orderItems    OrderItem[]
+  reviews       Review[]
+  cartItems     CartItem[]
+  wishlistItems WishlistItem[]
+
+  @@map("products")
+}
+
+model Outfit {
+  id          String          @id // e.g. outfit-01
+  slug        String          @unique
+  title       String
+  description String?         @db.Text
+  image       String          @db.VarChar(500)
+  images      Json?           // Array of image paths or image objects
+  occasion    String          // office, weekend, date, travel, everyday
+  style       String          // minimal, basic, smart-casual, streetstyle, vintage, sporty-chic
+  gender      String          @default("unisex") // men, women, unisex
+  season      String?         // all-season, summer, autumn-winter
+  featured    Boolean         @default(false)
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+
+  products    OutfitProduct[]
+
+  @@map("outfits")
+}
+
+model OutfitProduct {
+  id        String   @id @default(uuid())
+  outfitId  String   @map("outfit_id")
+  outfit    Outfit   @relation(fields: [outfitId], references: [id], onDelete: Cascade)
+  productId String   @map("product_id")
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([outfitId, productId])
+  @@map("outfit_products")
+}
+
+model Order {
+  id              String         @id // e.g. ORD-2025-0001
+  userId          String?        @map("user_id")
+  user            User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  guestSessionId  String?        @map("guest_session_id")
+  receiverName    String         @map("receiver_name")
+  phoneNumber     String         @map("phone_number")
+  shippingAddress String         @map("shipping_address") @db.Text
+  shippingMethod  String         @default("standard") @map("shipping_method")
+  paymentMethod   PaymentMethod  @default(COD) @map("payment_method")
+  paymentStatus   PaymentStatus  @default(UNPAID) @map("payment_status")
+  orderStatus     OrderStatus    @default(CONFIRMED) @map("order_status")
+  subtotal        Int
+  shippingFee     Int            @default(0) @map("shipping_fee")
+  discount        Int            @default(0)
+  total           Int
+  appliedCoupon   String?        @map("applied_coupon")
+  note            String?        @db.Text
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  items           OrderItem[]
+  reservation     StockReservation?
+
+  @@map("orders")
+}
+
+model StockReservation {
+  id        String   @id @default(uuid())
+  orderId   String   @unique @map("order_id")
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  items     Json
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([expiresAt])
+  @@map("stock_reservations")
+}
+
+model OrderItem {
+  id        String   @id @default(uuid())
+  orderId   String   @map("order_id")
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String   @map("product_id")
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
+  name      String
+  image     String?  @db.VarChar(500)
+  size      String?
+  color     String?
+  price     Int
+  quantity  Int
+  subtotal  Int
+
+  @@map("order_items")
+}
+
+model Coupon {
+  code          String    @id
+  type          String    // percent, fixed, freeship
+  value         Int
+  maxDiscount   Int?      @map("max_discount")
+  minOrderValue Int       @default(0) @map("min_order_value")
+  description   String?
+  isActive      Boolean   @default(true) @map("is_active")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  @@map("coupons")
+}
+
+model Review {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId String   @map("product_id")
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  rating    Int      @default(5)
+  comment   String?  @db.Text
+  images    Json?    // Array of image urls
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("reviews")
+}
+
+enum StyleStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model Style {
+  id          String      @id @db.VarChar(50)
+  slug        String      @unique @db.VarChar(100)
+  name        String      @db.VarChar(255)
+  description String?     @db.Text
+  image       String?     @db.VarChar(500)
+  status      StyleStatus @default(ACTIVE)
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @default(now()) @updatedAt @map("updated_at")
+
+  @@map("styles")
+}
+
+model Cart {
+  id             String     @id @default(uuid())
+  userId         String?    @unique @map("user_id")
+  user           User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  guestSessionId String?    @unique @map("guest_session_id")
+  appliedCoupon  String?    @map("applied_coupon")
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
+
+  items          CartItem[]
+
+  @@map("carts")
+}
+
+model CartItem {
+  id            String   @id @default(uuid())
+  cartId        String   @map("cart_id")
+  cart          Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  productId     String   @map("product_id")
+  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  lineId        String   @map("line_id")
+  name          String
+  category      String?
+  gender        String?
+  price         Int
+  originalPrice Int?     @map("original_price")
+  image         String?  @db.VarChar(500)
+  size          String?
+  color         String?
+  quantity      Int      @default(1)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@unique([cartId, lineId])
+  @@map("cart_items")
+}
+
+model Wishlist {
+  id             String         @id @default(uuid())
+  userId         String?        @unique @map("user_id")
+  user           User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  guestSessionId String?        @unique @map("guest_session_id")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  items          WishlistItem[]
+
+  @@map("wishlists")
+}
+
+model WishlistItem {
+  id         String   @id @default(uuid())
+  wishlistId String   @map("wishlist_id")
+  wishlist   Wishlist @relation(fields: [wishlistId], references: [id], onDelete: Cascade)
+  productId  String   @map("product_id")
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@unique([wishlistId, productId])
+  @@map("wishlist_items")
+}
+
