@@ -25,21 +25,33 @@ function mapPrismaProduct(p) {
     ? JSON.parse(p.colors || '[]')
     : ['Đen', 'Trắng'];
 
+  const totalCombos = (sizes.length || 1) * (colors.length || 1);
+  const totalStockNum = typeof p.stockQuantity === 'number' ? Math.max(0, p.stockQuantity) : 0;
+  const baseStock = Math.floor(totalStockNum / totalCombos);
+  let extraStock = totalStockNum % totalCombos;
+
   const variants = Array.isArray(p.variants) && p.variants.length > 0
     ? p.variants
     : (sizes.length > 0 && colors.length > 0)
     ? sizes.flatMap((sz) =>
-        colors.map((col) => ({
-          id: `${p.id}-${String(col).toLowerCase()}-${String(sz).toLowerCase()}`,
-          colorId: String(col).toLowerCase(),
-          colorName: col,
-          sizeId: String(sz).toLowerCase(),
-          sizeName: sz,
-          sku: `${(p.name || 'PRD').replace(/[^a-zA-Z0-9]/g, '').slice(0, 3).toUpperCase()}-${String(col).slice(0, 2).toUpperCase()}-${sz}`,
-          price: Number(p.price) || 0,
-          stockQuantity: 25,
-          status: 'ACTIVE',
-        }))
+        colors.map((col) => {
+          let variantStock = baseStock;
+          if (extraStock > 0) {
+            variantStock += 1;
+            extraStock -= 1;
+          }
+          return {
+            id: `${p.id}-${String(col).toLowerCase()}-${String(sz).toLowerCase()}`,
+            colorId: String(col).toLowerCase(),
+            colorName: col,
+            sizeId: String(sz).toLowerCase(),
+            sizeName: sz,
+            sku: `${(p.name || 'PRD').replace(/[^a-zA-Z0-9]/g, '').slice(0, 3).toUpperCase()}-${String(col).slice(0, 2).toUpperCase()}-${sz}`,
+            price: Number(p.price) || 0,
+            stockQuantity: variantStock,
+            status: variantStock > 0 ? 'ACTIVE' : 'OUT_OF_STOCK',
+          };
+        })
       )
     : [];
 
@@ -309,6 +321,12 @@ async function createProduct(productData) {
   const newId = productData.id || `p${num}`;
   const slug = productData.slug || name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') + `-${newId}`;
 
+  const calculatedStock = stockQuantity !== undefined
+    ? Math.max(0, parseInt(stockQuantity, 10) || 0)
+    : (Array.isArray(productData.variants) && productData.variants.length > 0)
+    ? Math.max(0, productData.variants.reduce((sum, v) => sum + (parseInt(v.stockQuantity, 10) || 0), 0))
+    : 100;
+
   try {
     const created = await prisma.product.create({
       data: {
@@ -323,7 +341,7 @@ async function createProduct(productData) {
         styles: Array.isArray(style) ? style : [style],
         badge,
         description,
-        stockQuantity: parseInt(stockQuantity, 10) || 100,
+        stockQuantity: calculatedStock,
         images: processImageArray(Array.isArray(images) && images.length > 0 ? images : ['/images/products/product-01.jpg'], newId).map((img) => (typeof img === 'string' ? img : img.url || '')).filter(Boolean),
         sizes: Array.isArray(sizes) ? sizes : [sizes],
         colors: Array.isArray(colors) ? colors : [colors],
@@ -373,7 +391,15 @@ async function updateProduct(id, updateData) {
     }
     if (updateData.badge !== undefined) dataToUpdate.badge = updateData.badge;
     if (updateData.description !== undefined) dataToUpdate.description = String(updateData.description);
-    if (updateData.stockQuantity !== undefined) dataToUpdate.stockQuantity = parseInt(updateData.stockQuantity, 10);
+    
+    // Xử lý cập nhật số lượng tồn kho (stockQuantity)
+    if (updateData.stockQuantity !== undefined) {
+      dataToUpdate.stockQuantity = Math.max(0, parseInt(updateData.stockQuantity, 10) || 0);
+    } else if (updateData.variants && Array.isArray(updateData.variants) && updateData.variants.length > 0) {
+      const sumStock = updateData.variants.reduce((sum, v) => sum + (parseInt(v.stockQuantity, 10) || 0), 0);
+      dataToUpdate.stockQuantity = Math.max(0, sumStock);
+    }
+
     if (updateData.isFeatured !== undefined) dataToUpdate.isFeatured = Boolean(updateData.isFeatured);
     
     if (updateData.style !== undefined || updateData.styles !== undefined || updateData.styleIds !== undefined) {
@@ -385,17 +411,20 @@ async function updateProduct(id, updateData) {
       const processed = processImageArray(raw, id);
       dataToUpdate.images = processed.map((img) => (typeof img === 'string' ? img : img.url || '')).filter(Boolean);
     }
+    
+    // Cập nhật sizes & colors
     if (updateData.sizes !== undefined) {
       dataToUpdate.sizes = Array.isArray(updateData.sizes) ? updateData.sizes : [updateData.sizes].filter(Boolean);
+    } else if (updateData.variants && Array.isArray(updateData.variants) && updateData.variants.length > 0) {
+      const derivedSizes = Array.from(new Set(updateData.variants.map((v) => v.sizeName || v.sizeId).filter(Boolean)));
+      if (derivedSizes.length > 0) dataToUpdate.sizes = derivedSizes;
     }
+
     if (updateData.colors !== undefined) {
       dataToUpdate.colors = Array.isArray(updateData.colors) ? updateData.colors : [updateData.colors].filter(Boolean);
-    }
-    if (updateData.variants && Array.isArray(updateData.variants) && updateData.variants.length > 0) {
+    } else if (updateData.variants && Array.isArray(updateData.variants) && updateData.variants.length > 0) {
       const derivedColors = Array.from(new Set(updateData.variants.map((v) => v.colorName || v.colorId).filter(Boolean)));
-      const derivedSizes = Array.from(new Set(updateData.variants.map((v) => v.sizeName || v.sizeId).filter(Boolean)));
-      if (derivedColors.length > 0 && !updateData.colors) dataToUpdate.colors = derivedColors;
-      if (derivedSizes.length > 0 && !updateData.sizes) dataToUpdate.sizes = derivedSizes;
+      if (derivedColors.length > 0) dataToUpdate.colors = derivedColors;
     }
 
     const updatedDb = await prisma.product.update({
@@ -407,7 +436,6 @@ async function updateProduct(id, updateData) {
     console.error('[productService] Prisma update failed:', err);
     throw err;
   }
-
 }
 
 /**

@@ -41,7 +41,7 @@ function sanitizeUser(user) {
 /**
  * Dịch vụ Đăng ký tài khoản
  */
-async function registerUser({ fullName, phoneNumber, email, password, stylePreference = 'minimal' }) {
+async function registerUser({ fullName, phoneNumber, email, password, stylePreference = 'minimal', source = 'ORGANIC' }) {
   let existingPhone = null;
   let existingEmail = null;
 
@@ -71,6 +71,8 @@ async function registerUser({ fullName, phoneNumber, email, password, stylePrefe
   const salt = await bcrypt.genSalt(10);
   const passwordHash = await bcrypt.hash(password, salt);
 
+  const normSource = String(source || 'ORGANIC').toUpperCase();
+
   let newUser = null;
   try {
     newUser = await prisma.user.create({
@@ -80,6 +82,7 @@ async function registerUser({ fullName, phoneNumber, email, password, stylePrefe
         email,
         passwordHash,
         stylePreference,
+        source: normSource,
       },
     });
   } catch (err) {
@@ -93,6 +96,7 @@ async function registerUser({ fullName, phoneNumber, email, password, stylePrefe
       passwordHash,
       role: 'CUSTOMER',
       stylePreference,
+      source: normSource,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -169,7 +173,7 @@ function maskIdentifier(val) {
 /**
  * Gửi mã OTP tới Email hoặc Số điện thoại (Đăng ký / Quên mật khẩu)
  */
-async function sendOtp(target) {
+async function sendOtp(target, secondaryTarget = null) {
   if (!target) {
     const error = new Error('Vui lòng cung cấp email hoặc số điện thoại');
     error.statusCode = 400;
@@ -177,7 +181,9 @@ async function sendOtp(target) {
   }
 
   const cleanId = String(target).trim().toLowerCase();
+  const cleanAlt = secondaryTarget ? String(secondaryTarget).trim().toLowerCase() : null;
   const isEmail = cleanId.includes('@');
+  const isAltEmail = cleanAlt && cleanAlt.includes('@');
 
   // Tra cứu tài khoản trong MySQL
   let user = null;
@@ -187,6 +193,7 @@ async function sendOtp(target) {
         OR: [
           { email: cleanId },
           { phoneNumber: cleanId },
+          ...(cleanAlt ? [{ email: cleanAlt }, { phoneNumber: cleanAlt }] : []),
         ],
       },
     });
@@ -203,16 +210,21 @@ async function sendOtp(target) {
     user: user || null,
     expiresAt,
     attempts: 0,
+    cleanId,
+    cleanAlt,
   };
 
   otpStore.set(cleanId, otpData);
+  if (cleanAlt) {
+    otpStore.set(cleanAlt, otpData);
+  }
   if (user) {
     if (user.email && user.email !== cleanId) otpStore.set(user.email, otpData);
     if (user.phoneNumber && user.phoneNumber !== cleanId) otpStore.set(user.phoneNumber, otpData);
   }
 
-  // Gửi email nếu mục tiêu là email hoặc user có email
-  const destinationEmail = isEmail ? cleanId : user?.email;
+  // Gửi email nếu mục tiêu là email hoặc user có email hoặc alt là email
+  const destinationEmail = isEmail ? cleanId : (isAltEmail ? cleanAlt : user?.email);
   if (destinationEmail) {
     const emailResult = await emailService.sendOtpEmail(destinationEmail, code, user?.fullName || 'Quý khách');
     if (!emailResult.success) {
@@ -260,10 +272,14 @@ async function verifyOtp(target, otp) {
   }
 
   let record = otpStore.get(cleanId);
-  if (!record && cleanId.includes('@')) {
-    // Thử tìm theo phone nếu user đã lưu cả hai
+  if (!record) {
+    // Thử tìm chéo qua user hoặc cleanAlt
     for (const [, val] of otpStore.entries()) {
-      if (val.user && val.user.email === cleanId) {
+      if (
+        val.cleanId === cleanId ||
+        val.cleanAlt === cleanId ||
+        (val.user && (val.user.email === cleanId || val.user.phoneNumber === cleanId))
+      ) {
         record = val;
         break;
       }

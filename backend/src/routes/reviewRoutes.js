@@ -21,7 +21,7 @@ router.get('/admin/stats', authenticate, authorizeAdmin, reviewController.getRev
 // PATCH /api/v1/reviews/:id/status (Admin duyệt / ẩn đánh giá)
 router.patch('/:id/status', authenticate, authorizeAdmin, reviewController.updateReviewStatus);
 
-// DELETE /api/v1/reviews/:id (Admin xóa đánh giá vi phạm)
-router.delete('/:id', authenticate, authorizeAdmin, reviewController.deleteReview);
+// DELETE /api/v1/reviews/:id (Người dùng xóa đánh giá của mình hoặc Admin xóa)
+router.delete('/:id', authenticate, reviewController.deleteReview);
 
 module.exports = router;

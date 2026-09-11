@@ -13,12 +13,22 @@ const path = require('path');
 const cookieParser = require('cookie-parser');
 const logger = require('morgan');
 const cors = require('cors');
+const helmet = require('helmet');
 
 const apiRouter = require('./src/routes/api');
 const errorHandler = require('./src/middlewares/errorHandler');
 const { sendError } = require('./src/utils/response');
+const { generalLimiter, authLimiter, aiLimiter } = require('./src/middlewares/rateLimiter');
 
 const app = express();
+
+// Bảo vệ HTTP Headers bằng Helmet (cho phép Cross-Origin Resources để Next.js load ảnh tĩnh)
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+    contentSecurityPolicy: false,
+  })
+);
 
 // Cấu hình CORS để Next.js (http://localhost:3000) có thể gọi API mà không bị chặn
 const allowedOrigins = [
@@ -46,6 +56,7 @@ app.use(
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'x-session-id', 'x-guest-id'],
+    exposedHeaders: ['x-session-id'],
   })
 );
 
@@ -70,6 +81,11 @@ app.use((req, res, next) => {
   res.set('Expires', '0');
   next();
 });
+
+// Áp dụng Rate Limiter cho các endpoint nhạy cảm và toàn bộ API
+app.use('/api/v1/auth', authLimiter);
+app.use('/api/v1/ai', aiLimiter);
+app.use('/api/v1', generalLimiter);
 
 // Gắn toàn bộ API phiên bản 1 vào /api/v1
 app.use('/api/v1', apiRouter);

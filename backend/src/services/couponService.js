@@ -1,79 +1,73 @@
 /**
- * Quản lý kho mã giảm giá (Coupons / Vouchers)
+ * Quản lý kho mã giảm giá (Coupons / Vouchers) kết nối trực tiếp MySQL qua Prisma
  */
 
-const couponsMap = new Map([
-  [
-    'ROUTINE10',
-    {
-      code: 'ROUTINE10',
-      type: 'percent',
-      value: 10,
-      maxDiscount: 100000,
-      minOrderValue: 200000,
-      description: 'Giảm 10% tối đa 100k cho đơn từ 200k',
-      isActive: true,
-      startDate: '2025-01-01',
-      endDate: '2026-12-31',
-    },
-  ],
-  [
-    'ROUTINE50K',
-    {
-      code: 'ROUTINE50K',
-      type: 'fixed',
-      value: 50000,
-      minOrderValue: 300000,
-      description: 'Giảm 50.000đ cho đơn từ 300k',
-      isActive: true,
-      startDate: '2025-01-01',
-      endDate: '2026-12-31',
-    },
-  ],
-  [
-    'FREESHIP',
-    {
-      code: 'FREESHIP',
-      type: 'freeship',
-      value: 30000,
-      minOrderValue: 0,
-      description: 'Miễn phí vận chuyển toàn quốc',
-      isActive: true,
-      startDate: '2025-01-01',
-      endDate: '2026-12-31',
-    },
-  ],
-  [
-    'WELCOME20',
-    {
-      code: 'WELCOME20',
-      type: 'percent',
-      value: 20,
-      maxDiscount: 200000,
-      minOrderValue: 500000,
-      description: 'Giảm 20% tối đa 200k cho thành viên mới',
-      isActive: true,
-      startDate: '2025-01-01',
-      endDate: '2026-12-31',
-    },
-  ],
-]);
+const prisma = require('../config/prisma');
 
 /**
- * Lấy danh sách các mã giảm giá đang kích hoạt
+ * Định dạng Coupon trả về client
  */
-async function getActiveCoupons() {
-  const now = new Date();
-  const list = Array.from(couponsMap.values()).filter((c) => {
-    if (!c.isActive) return false;
-    if (c.endDate && new Date(c.endDate) < now) return false;
-    return true;
-  });
-  return list;
+function formatCoupon(coupon) {
+  if (!coupon) return null;
+  return {
+    code: coupon.code,
+    type: coupon.type,
+    value: coupon.value,
+    maxDiscount: coupon.maxDiscount,
+    minOrderValue: coupon.minOrderValue,
+    description: coupon.description || '',
+    isActive: Boolean(coupon.isActive),
+    createdAt: coupon.createdAt,
+  };
 }
 
 /**
- * Kiểm tra mã giảm giá và tính toán số tiền giảm
+ * Lấy toàn bộ mã giảm giá cho Admin (kể cả mã đang tắt)
+ */
+async function getAllCouponsForAdmin({ status, search } = {}) {
+  try {
+    const where = {};
+    if (status === 'ACTIVE') where.isActive = true;
+    if (status === 'INACTIVE') where.isActive = false;
+
+    if (search && search.trim()) {
+      const needle = search.trim();
+      where.OR = [
+        { code: { contains: needle } },
+        { description: { contains: needle } },
+      ];
+    }
+
+    const records = await prisma.coupon.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return records.map(formatCoupon);
+  } catch (err) {
+    console.error('[couponService] getAllCouponsForAdmin failed:', err.message);
+    return [];
+  }
+}
+
+/**
+ * Lấy danh sách các mã giảm giá đang kích hoạt cho Storefront
+ */
+async function getActiveCoupons() {
+  try {
+    const records = await prisma.coupon.findMany({
+      where: { isActive: true },
+      orderBy: { createdAt: 'desc' },
+    });
+    return records.map(formatCoupon);
+  } catch (err) {
+    console.error('[couponService] getActiveCoupons failed:', err.message);
+    return [];
+  }
+}
+
+/**
+ * Kiểm tra mã giảm giá và tính toán số tiền giảm theo giá trị đơn hàng
  */
 async function validateCoupon(code, subtotal = 0) {
   if (!code || typeof code !== 'string') {
@@ -83,7 +77,9 @@ async function validateCoupon(code, subtotal = 0) {
   }
 
   const normalized = code.trim().toUpperCase();
-  const coupon = couponsMap.get(normalized);
+  const coupon = await prisma.coupon.findUnique({
+    where: { code: normalized },
+  });
 
   if (!coupon || !coupon.isActive) {
     const error = new Error(`Mã giảm giá "${normalized}" không hợp lệ hoặc đã hết hiệu lực`);
@@ -103,7 +99,10 @@ async function validateCoupon(code, subtotal = 0) {
 
   let discount = 0;
   if (coupon.type === 'percent') {
-    discount = Math.min(Math.round((orderValue * coupon.value) / 100), coupon.maxDiscount || Infinity);
+    discount = Math.min(
+      Math.round((orderValue * coupon.value) / 100),
+      coupon.maxDiscount || Infinity
+    );
   } else if (coupon.type === 'fixed') {
     discount = Math.min(coupon.value, orderValue);
   } else if (coupon.type === 'freeship') {
@@ -116,15 +115,15 @@ async function validateCoupon(code, subtotal = 0) {
     type: coupon.type,
     discountAmount: discount,
     description: coupon.description,
-    coupon,
+    coupon: formatCoupon(coupon),
   };
 }
 
 /**
- * Tạo mã giảm giá mới (Admin)
+ * Tạo mã giảm giá mới (Admin) - Lưu vào MySQL
  */
 async function createCoupon(couponData) {
-  const { code, type = 'percent', value, minOrderValue = 0, maxDiscount, description } = couponData;
+  const { code, type = 'percent', value, minOrderValue = 0, maxDiscount, description, isActive = true } = couponData;
 
   if (!code || typeof code !== 'string' || !code.trim()) {
     const error = new Error('Mã giảm giá không được để trống');
@@ -133,8 +132,9 @@ async function createCoupon(couponData) {
   }
 
   const normalized = code.trim().toUpperCase();
-  if (couponsMap.has(normalized)) {
-    const error = new Error(`Mã giảm giá "${normalized}" đã tồn tại`);
+  const existing = await prisma.coupon.findUnique({ where: { code: normalized } });
+  if (existing) {
+    const error = new Error(`Mã giảm giá "${normalized}" đã tồn tại trên hệ thống`);
     error.statusCode = 409;
     throw error;
   }
@@ -145,62 +145,79 @@ async function createCoupon(couponData) {
     throw error;
   }
 
-  const newCoupon = {
-    code: normalized,
-    type: ['percent', 'fixed', 'freeship'].includes(type) ? type : 'percent',
-    value: Number(value),
-    minOrderValue: Number(minOrderValue) || 0,
-    maxDiscount: maxDiscount ? Number(maxDiscount) : null,
-    description: description || `Giảm giá theo mã ${normalized}`,
-    isActive: true,
-    createdAt: new Date().toISOString(),
-  };
+  const created = await prisma.coupon.create({
+    data: {
+      code: normalized,
+      type: ['percent', 'fixed', 'freeship'].includes(type) ? type : 'percent',
+      value: parseInt(value, 10),
+      minOrderValue: parseInt(minOrderValue, 10) || 0,
+      maxDiscount: maxDiscount ? parseInt(maxDiscount, 10) : null,
+      description: description || `Giảm giá theo mã ${normalized}`,
+      isActive: Boolean(isActive),
+    },
+  });
 
-  couponsMap.set(normalized, newCoupon);
-  return newCoupon;
+  return formatCoupon(created);
 }
 
 /**
- * Cập nhật mã giảm giá (Admin)
+ * Cập nhật mã giảm giá (Admin) - Cập nhật MySQL
  */
 async function updateCoupon(code, updateData) {
   const normalized = (code || '').trim().toUpperCase();
-  const coupon = couponsMap.get(normalized);
+  const existing = await prisma.coupon.findUnique({ where: { code: normalized } });
 
-  if (!coupon) {
+  if (!existing) {
     const error = new Error(`Không tìm thấy mã giảm giá "${normalized}"`);
     error.statusCode = 404;
     throw error;
   }
 
-  const updated = {
-    ...coupon,
-    ...updateData,
-    code: coupon.code, // giữ nguyên mã
-    value: updateData.value !== undefined ? Number(updateData.value) : coupon.value,
-    minOrderValue:
-      updateData.minOrderValue !== undefined ? Number(updateData.minOrderValue) : coupon.minOrderValue,
-    updatedAt: new Date().toISOString(),
-  };
+  const dataToUpdate = {};
+  if (updateData.type !== undefined) {
+    dataToUpdate.type = ['percent', 'fixed', 'freeship'].includes(updateData.type)
+      ? updateData.type
+      : existing.type;
+  }
+  if (updateData.value !== undefined) {
+    dataToUpdate.value = parseInt(updateData.value, 10);
+  }
+  if (updateData.minOrderValue !== undefined) {
+    dataToUpdate.minOrderValue = parseInt(updateData.minOrderValue, 10);
+  }
+  if (updateData.maxDiscount !== undefined) {
+    dataToUpdate.maxDiscount = updateData.maxDiscount ? parseInt(updateData.maxDiscount, 10) : null;
+  }
+  if (updateData.description !== undefined) {
+    dataToUpdate.description = updateData.description;
+  }
+  if (updateData.isActive !== undefined) {
+    dataToUpdate.isActive = Boolean(updateData.isActive);
+  }
 
-  couponsMap.set(normalized, updated);
-  return updated;
+  const updated = await prisma.coupon.update({
+    where: { code: normalized },
+    data: dataToUpdate,
+  });
+
+  return formatCoupon(updated);
 }
 
 /**
- * Xóa/Vô hiệu hóa mã giảm giá (Admin)
+ * Xóa mã giảm giá (Admin) - Xóa khỏi MySQL
  */
 async function deleteCoupon(code) {
   const normalized = (code || '').trim().toUpperCase();
-  const coupon = couponsMap.get(normalized);
+  const existing = await prisma.coupon.findUnique({ where: { code: normalized } });
 
-  if (!coupon) {
+  if (!existing) {
     const error = new Error(`Không tìm thấy mã giảm giá "${normalized}"`);
     error.statusCode = 404;
     throw error;
   }
 
-  couponsMap.delete(normalized);
+  await prisma.coupon.delete({ where: { code: normalized } });
+
   return {
     deleted: true,
     code: normalized,
@@ -209,7 +226,7 @@ async function deleteCoupon(code) {
 }
 
 module.exports = {
-  couponsMap,
+  getAllCouponsForAdmin,
   getActiveCoupons,
   validateCoupon,
   createCoupon,

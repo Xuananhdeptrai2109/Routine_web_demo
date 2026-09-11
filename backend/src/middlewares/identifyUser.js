@@ -14,10 +14,11 @@ function identifyUser(req, res, next) {
       const token = authHeader.split(' ')[1];
       try {
         const decoded = jwt.verify(token, secret);
+        const targetUserId = decoded.userId || decoded.id;
         req.user = decoded;
-        req.userId = decoded.userId;
+        req.userId = targetUserId;
         req.isAuth = true;
-        req.identityId = decoded.userId;
+        req.identityId = targetUserId;
         return next();
       } catch (err) {
         // Token không hợp lệ hoặc hết hạn: bỏ qua để chuyển sang định danh khách
@@ -28,7 +29,7 @@ function identifyUser(req, res, next) {
     const sessionId =
       req.headers['x-session-id'] ||
       req.headers['x-guest-id'] ||
-      req.query.sessionId ||
+      req.query?.sessionId ||
       req.cookies?.routine_session_id;
 
     if (sessionId) {
@@ -38,11 +39,18 @@ function identifyUser(req, res, next) {
       return next();
     }
 
-    // 3. Khách mặc định nếu không gửi session id
-    const fallbackId = req.ip || 'anonymous';
-    req.identityId = `guest_${fallbackId}`;
-    req.sessionId = fallbackId;
+    // 3. Tự động sinh session id duy nhất cho khách vãng lai (không gộp chung IP)
+    const crypto = require('crypto');
+    const newGuestId = 'g_' + (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 12) + Date.now().toString(36));
+    req.identityId = `guest_${newGuestId}`;
+    req.sessionId = newGuestId;
     req.isAuth = false;
+
+    // Gắn session id vào header để client lưu trữ lại
+    res.setHeader('x-session-id', newGuestId);
+    if (res.cookie) {
+      res.cookie('routine_session_id', newGuestId, { maxAge: 30 * 24 * 3600 * 1000, httpOnly: false });
+    }
     next();
   } catch (error) {
     next(error);

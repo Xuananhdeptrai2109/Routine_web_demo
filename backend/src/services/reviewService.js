@@ -143,9 +143,17 @@ async function createReview(user, productId, reviewData) {
     throw error;
   }
 
-  if (!comment || typeof comment !== 'string' || comment.trim().length < 5) {
-    const error = new Error('Nội dung đánh giá phải có tối thiểu 5 ký tự');
+  if (!comment || typeof comment !== 'string' || comment.trim().length < 2) {
+    const error = new Error('Vui lòng nhập nội dung đánh giá (tối thiểu 2 ký tự)');
     error.statusCode = 400;
+    throw error;
+  }
+
+  const userId = user.id || user.userId;
+  const userInDb = await prisma.user.findUnique({ where: { id: userId } });
+  if (!userInDb) {
+    const error = new Error('Phiên đăng nhập không hợp lệ hoặc tài khoản không tồn tại trong hệ thống. Vui lòng đăng nhập lại.');
+    error.statusCode = 401;
     throw error;
   }
 
@@ -154,7 +162,7 @@ async function createReview(user, productId, reviewData) {
   const created = await prisma.review.create({
     data: {
       productId: product.id,
-      userId: user.id || user.userId,
+      userId: userInDb.id,
       rating: star,
       comment: comment.trim(),
       images: finalImages,
@@ -175,12 +183,23 @@ async function createReview(user, productId, reviewData) {
   };
 }
 
-async function deleteReview(reviewId) {
+async function deleteReview(reviewId, requestingUser = null) {
   const existing = await prisma.review.findUnique({ where: { id: reviewId } });
   if (!existing) {
     const error = new Error(`Không tìm thấy đánh giá với mã "${reviewId}"`);
     error.statusCode = 404;
     throw error;
+  }
+
+  // Kiểm tra quyền xóa: Phải là Admin HOẶC chủ sở hữu của review đó
+  if (requestingUser) {
+    const isAdmin = requestingUser.role === 'ADMIN';
+    const isOwner = existing.userId === requestingUser.id;
+    if (!isAdmin && !isOwner) {
+      const error = new Error('Bạn không có quyền xóa đánh giá của người khác');
+      error.statusCode = 403;
+      throw error;
+    }
   }
 
   const deleted = await prisma.review.delete({

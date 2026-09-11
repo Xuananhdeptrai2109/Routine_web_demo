@@ -50,7 +50,7 @@ const seedCustomers = [
 /**
  * Lấy danh sách khách hàng (Admin)
  */
-async function getAllCustomers({ page = 1, limit = 10, search = '', status = 'ALL', sortBy = 'createdAt' } = {}) {
+async function getAllCustomers({ page = 1, limit = 10, search = '', status = 'ALL', source = 'ALL', sortBy = 'createdAt' } = {}) {
   let userList = [];
 
   try {
@@ -90,6 +90,7 @@ async function getAllCustomers({ page = 1, limit = 10, search = '', status = 'AL
       role: u.role || 'CUSTOMER',
       avatar: u.avatar || null,
       stylePreference: u.stylePreference || 'minimal',
+      source: u.source || 'ORGANIC',
       status: currentStatus,
       totalOrders,
       totalSpent,
@@ -112,6 +113,11 @@ async function getAllCustomers({ page = 1, limit = 10, search = '', status = 'AL
   // Lọc theo trạng thái
   if (status && status !== 'ALL') {
     formatted = formatted.filter((c) => c.status === status.toUpperCase());
+  }
+
+  // Lọc theo nguồn (TikTok, Facebook, Instagram, Organic...)
+  if (source && source !== 'ALL') {
+    formatted = formatted.filter((c) => (c.source || 'ORGANIC').toUpperCase() === source.toUpperCase());
   }
 
   // Sắp xếp

@@ -42,6 +42,7 @@ model User {
   role            Role        @default(CUSTOMER)
   avatar          String?     @db.VarChar(500)
   stylePreference String?     @default("minimal") @map("style_preference")
+  source          String?     @default("ORGANIC")
   createdAt       DateTime    @default(now()) @map("created_at")
   updatedAt       DateTime    @updatedAt @map("updated_at")
 
@@ -167,6 +168,7 @@ model Order {
   discount        Int            @default(0)
   total           Int
   appliedCoupon   String?        @map("applied_coupon")
+  attributionSource String?      @default("ORGANIC") @map("attribution_source")
   note            String?        @db.Text
   createdAt       DateTime       @default(now()) @map("created_at")
   updatedAt       DateTime       @updatedAt @map("updated_at")
@@ -311,5 +313,34 @@ model WishlistItem {
 
   @@unique([wishlistId, productId])
   @@map("wishlist_items")
+}
+
+model TrafficLog {
+  id             String   @id @default(uuid())
+  platform       String   // TIKTOK, FACEBOOK, INSTAGRAM, DIRECT, OTHER
+  campaign       String?
+  productId      String?  @map("product_id")
+  guestSessionId String?  @map("guest_session_id")
+  userId         String?  @map("user_id")
+  action         String   @default("VIEW") // VIEW, REGISTER, ADD_TO_CART, PURCHASE
+  metadata       Json?
+  ipAddress      String?  @map("ip_address")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([platform])
+  @@index([guestSessionId])
+  @@index([userId])
+  @@index([productId])
+  @@index([createdAt])
+  @@map("traffic_logs")
+}
+
+model StoreSetting {
+  settingKey   String   @id @map("setting_key") @db.VarChar(191)
+  settingValue String   @map("setting_value") @db.LongText
+  description  String?  @db.VarChar(255)
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("store_settings")
 }
 

@@ -6,8 +6,8 @@
 
 const prisma = require('../config/prisma');
 
-async function getHeldQuantity(productId, excludeOrderId = null) {
-  const reservations = await prisma.stockReservation.findMany({
+async function getHeldQuantity(productId, excludeOrderId = null, client = prisma) {
+  const reservations = await client.stockReservation.findMany({
     where: {
       expiresAt: { gt: new Date() },
       ...(excludeOrderId ? { orderId: { not: excludeOrderId } } : {}),
@@ -26,33 +26,6 @@ async function getHeldQuantity(productId, excludeOrderId = null) {
 async function reserveStock(orderId, items = [], durationMinutes = 5) {
   if (!orderId || !Array.isArray(items) || items.length === 0) return null;
 
-  for (const item of items) {
-    const qty = Number(item.quantity) || 1;
-    let currentStock = 100;
-
-    try {
-      const product = await prisma.product.findUnique({
-        where: { id: item.productId },
-        select: { stockQuantity: true },
-      });
-      if (product && product.stockQuantity !== undefined) {
-        currentStock = Number(product.stockQuantity);
-      }
-    } catch (err) {
-      console.warn(`[stockReservation] Không thể truy vấn sản phẩm ${item.productId}:`, err.message);
-    }
-
-    const heldStock = await getHeldQuantity(item.productId, orderId);
-    const availableStock = Math.max(0, currentStock - heldStock);
-    if (availableStock < qty) {
-      const error = new Error(
-        `Sản phẩm "${item.name || item.productId}" không đủ số lượng (chỉ còn ${availableStock} khả dụng do đang có khách hàng khác giữ chỗ).`
-      );
-      error.statusCode = 400;
-      throw error;
-    }
-  }
-
   const expiresAt = new Date(Date.now() + durationMinutes * 60 * 1000);
   const reservationItems = items.map((item) => ({
     productId: item.productId,
@@ -60,18 +33,67 @@ async function reserveStock(orderId, items = [], durationMinutes = 5) {
     quantity: Number(item.quantity) || 1,
   }));
 
-  await prisma.stockReservation.upsert({
-    where: { orderId },
-    create: { orderId, items: reservationItems, expiresAt },
-    update: { items: reservationItems, expiresAt },
-  });
+  // Thực thi bên trong Transaction để đảm bảo tính ACID và chống race-condition
+  return await prisma.$transaction(async (tx) => {
+    // 1. Kiểm tra tồn kho khả dụng cho từng sản phẩm
+    for (const item of items) {
+      const qty = Number(item.quantity) || 1;
+      let currentStock = 100;
 
-  return {
-    orderId,
-    isHeld: true,
-    expiresAt: expiresAt.toISOString(),
-    remainingSeconds: Math.round((expiresAt.getTime() - Date.now()) / 1000),
-  };
+      try {
+        const product = await tx.product.findUnique({
+          where: { id: item.productId },
+          select: { stockQuantity: true },
+        });
+        if (product && product.stockQuantity !== undefined) {
+          currentStock = Number(product.stockQuantity);
+        }
+      } catch (err) {
+        console.warn(`[stockReservation] Không thể truy vấn sản phẩm ${item.productId}:`, err.message);
+      }
+
+      const heldStock = await getHeldQuantity(item.productId, orderId, tx);
+      const availableStock = Math.max(0, currentStock - heldStock);
+      if (availableStock < qty) {
+        const error = new Error(
+          `Sản phẩm "${item.name || item.productId}" không đủ số lượng (chỉ còn ${availableStock} khả dụng do đang có khách hàng khác giữ chỗ).`
+        );
+        error.statusCode = 400;
+        throw error;
+      }
+    }
+
+    // 2. Ghi nhận hoặc cập nhật lượt giữ hàng
+    await tx.stockReservation.upsert({
+      where: { orderId },
+      create: { orderId, items: reservationItems, expiresAt },
+      update: { items: reservationItems, expiresAt },
+    });
+
+    // 3. Double-check: kiểm tra lại tổng số lượng giữ kho sau khi ghi
+    for (const item of items) {
+      const product = await tx.product.findUnique({
+        where: { id: item.productId },
+        select: { stockQuantity: true },
+      });
+      const currentStock = product ? Number(product.stockQuantity) : 100;
+      const totalHeld = await getHeldQuantity(item.productId, null, tx);
+      if (totalHeld > currentStock) {
+        const error = new Error(
+          `Sản phẩm "${item.name || item.productId}" vừa hết hàng do có giao dịch khác thanh toán đồng thời.`
+        );
+        error.statusCode = 400;
+        throw error;
+      }
+    }
+
+    return {
+      orderId,
+      isHeld: true,
+      expiresAt: expiresAt.toISOString(),
+      remainingSeconds: Math.round((expiresAt.getTime() - Date.now()) / 1000),
+    };
+  });
 }
 
 async function commitStock(orderId) {

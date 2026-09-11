@@ -6,7 +6,7 @@ const { sendSuccess, sendError } = require('../utils/response');
  */
 async function register(req, res, next) {
   try {
-    const { fullName, phoneNumber, email, password, stylePreference } = req.body;
+    const { fullName, phoneNumber, email, password, stylePreference, source, attributionSource } = req.body;
 
     const result = await authService.registerUser({
       fullName,
@@ -14,6 +14,7 @@ async function register(req, res, next) {
       email,
       password,
       stylePreference,
+      source: source || attributionSource || 'ORGANIC',
     });
 
     return sendSuccess(res, result, 'Đăng ký tài khoản thành công', 201);
@@ -64,8 +65,9 @@ async function sendOtp(req, res, next) {
   try {
     const { identifier, email, phoneNumber, phone } = req.body;
     const target = identifier || email || phoneNumber || phone;
+    const secondary = (target === email) ? (phoneNumber || phone) : (email || null);
 
-    const result = await authService.sendOtp(target);
+    const result = await authService.sendOtp(target, secondary);
     return sendSuccess(res, result, result.message || 'Mã OTP đã được gửi');
   } catch (error) {
     next(error);

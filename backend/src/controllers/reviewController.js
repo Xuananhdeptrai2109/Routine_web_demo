@@ -40,7 +40,7 @@ async function createReview(req, res, next) {
 async function deleteReview(req, res, next) {
   try {
     const { id } = req.params;
-    const deleted = await reviewService.deleteReview(id);
+    const deleted = await reviewService.deleteReview(id, req.user);
     return sendSuccess(res, deleted, 'Xóa đánh giá thành công');
   } catch (error) {
     next(error);

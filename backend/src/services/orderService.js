@@ -63,7 +63,7 @@ async function formatOrder(o) {
     orderId: i.orderId,
     productId: i.productId,
     name: i.name,
-    image: i.image || '',
+    image: i.image && i.image.trim() !== '' ? i.image : '/images/placeholder.svg',
     size: i.size || '',
     color: i.color || '',
     price: i.price,
@@ -97,10 +97,24 @@ async function formatOrder(o) {
     shipping: o.shippingFee,
     discount: o.discount,
     total: o.total,
+    attributionSource: o.attributionSource || (o.user?.source || 'ORGANIC'),
     note: o.note || '',
     createdAt: o.createdAt,
     updatedAt: o.updatedAt,
     items,
+    isMember: !!o.userId && !!o.user,
+    user: o.user
+      ? {
+          id: o.user.id,
+          fullName: o.user.fullName,
+          email: o.user.email,
+          phoneNumber: o.user.phoneNumber,
+          avatar: o.user.avatar,
+          source: o.user.source || 'ORGANIC',
+          role: o.user.role,
+          createdAt: o.user.createdAt,
+        }
+      : null,
     reservation: await stockReservationService.getReservation(o.id),
   };
 
@@ -129,7 +143,7 @@ async function createOrder(identityId, orderInput) {
   let orderItems = items;
 
   if (!orderItems || !Array.isArray(orderItems) || orderItems.length === 0) {
-    const currentCart = cartService.getCart(identityId);
+    const currentCart = await cartService.getCart(identityId);
     if (!currentCart.items || currentCart.items.length === 0) {
       const error = new Error('Giỏ hàng trống, không thể tạo đơn hàng');
       error.statusCode = 400;
@@ -181,16 +195,28 @@ async function createOrder(identityId, orderInput) {
   const isRealUser = cleanUserId && (cleanUserId.startsWith('usr-') || cleanUserId.length === 36);
 
   let validUserId = null;
+  let userAccount = null;
   if (isRealUser) {
     try {
       const userExists = await prisma.user.findUnique({ where: { id: cleanUserId } });
-      if (userExists) validUserId = cleanUserId;
+      if (userExists) {
+        validUserId = cleanUserId;
+        userAccount = userExists;
+      }
     } catch (uErr) {
       // fallback
     }
   }
 
   const initialOrderStatus = finalPayMethod === 'VNPAY' ? 'PENDING' : 'CONFIRMED';
+  const providedSource = orderInput.attributionSource || orderInput.source;
+  const resolvedSource =
+    providedSource && providedSource !== 'ORGANIC'
+      ? providedSource
+      : userAccount?.source && userAccount.source !== 'ORGANIC'
+      ? userAccount.source
+      : providedSource || 'ORGANIC';
+  const normAttribution = String(resolvedSource).toUpperCase();
 
   const created = await prisma.order.create({
     data: {
@@ -208,18 +234,36 @@ async function createOrder(identityId, orderInput) {
       shippingFee: calculatedShipping,
       discount: calculatedDiscount,
       total: calculatedTotal,
+      attributionSource: normAttribution,
       note: note || '',
       items: {
-        create: orderItems.map((item) => ({
-          productId: item.productId,
-          name: item.name || 'Sản phẩm',
-          image: item.image || '',
-          size: item.size || 'M',
-          color: item.color || 'Đen',
-          price: Number(item.price) || 0,
-          quantity: Number(item.quantity) || 1,
-          subtotal: (Number(item.price) || 0) * (Number(item.quantity) || 1),
-        })),
+        create: await Promise.all(
+          orderItems.map(async (item) => {
+            let itemImg = item.image || '';
+            if ((!itemImg || itemImg.trim() === '') && item.productId) {
+              try {
+                const prod = await prisma.product.findUnique({
+                  where: { id: item.productId },
+                  select: { images: true },
+                });
+                if (prod && prod.images) {
+                  const pImgs = typeof prod.images === 'string' ? JSON.parse(prod.images) : prod.images;
+                  if (Array.isArray(pImgs) && pImgs.length > 0) itemImg = pImgs[0];
+                }
+              } catch (e) {}
+            }
+            return {
+              productId: item.productId,
+              name: item.name || 'Sản phẩm',
+              image: itemImg && itemImg.trim() !== '' ? itemImg : '/images/placeholder.svg',
+              size: item.size || 'M',
+              color: item.color || 'Đen',
+              price: Number(item.price) || 0,
+              quantity: Number(item.quantity) || 1,
+              subtotal: (Number(item.price) || 0) * (Number(item.quantity) || 1),
+            };
+          })
+        ),
       },
     },
     include: { items: true },
@@ -311,19 +355,6 @@ async function getOrders({ identityId, status, page = 1, limit = 10 } = {}) {
     }),
   ]);
 
-  // Nếu identity chưa có đơn riêng, trả về các đơn mẫu trong DB để xem
-  if (total === 0 && identityId) {
-    const fallbackWhere = status ? { orderStatus: status.toUpperCase().trim() } : {};
-    total = await prisma.order.count({ where: fallbackWhere });
-    records = await prisma.order.findMany({
-      where: fallbackWhere,
-      skip,
-      take: pageSize,
-      include: { items: true },
-      orderBy: { createdAt: 'desc' },
-    });
-  }
-
   const totalPages = Math.ceil(total / pageSize);
   const items = await Promise.all(records.map(formatOrder));
 
@@ -347,7 +378,21 @@ async function getOrderById(id) {
   if (!id) return null;
   const order = await prisma.order.findUnique({
     where: { id },
-    include: { items: true },
+    include: {
+      items: true,
+      user: {
+        select: {
+          id: true,
+          fullName: true,
+          email: true,
+          phoneNumber: true,
+          avatar: true,
+          source: true,
+          role: true,
+          createdAt: true,
+        },
+      },
+    },
   });
 
   return order ? formatOrder(order) : null;
@@ -418,11 +463,33 @@ async function reorder(id, identityId) {
 /**
  * Lấy toàn bộ đơn hàng của tất cả khách hàng (Admin)
  */
-async function getAllOrdersForAdmin({ status, page = 1, limit = 20, search } = {}) {
+async function getAllOrdersForAdmin({
+  status,
+  page = 1,
+  limit = 50,
+  search,
+  source,
+  paymentStatus,
+  customerType,
+} = {}) {
   const where = {};
 
-  if (status) {
+  if (status && status !== 'ALL') {
     where.orderStatus = status.toUpperCase().trim();
+  }
+
+  if (paymentStatus && paymentStatus !== 'ALL') {
+    where.paymentStatus = paymentStatus.toUpperCase().trim();
+  }
+
+  if (source && source !== 'ALL') {
+    where.attributionSource = source.toUpperCase().trim();
+  }
+
+  if (customerType === 'MEMBER') {
+    where.userId = { not: null };
+  } else if (customerType === 'GUEST') {
+    where.userId = null;
   }
 
   if (search && search.trim()) {
@@ -431,11 +498,13 @@ async function getAllOrdersForAdmin({ status, page = 1, limit = 20, search } = {
       { id: { contains: needle } },
       { receiverName: { contains: needle } },
       { phoneNumber: { contains: needle } },
+      { user: { fullName: { contains: needle } } },
+      { user: { email: { contains: needle } } },
     ];
   }
 
   const currentPage = Math.max(1, parseInt(page, 10) || 1);
-  const pageSize = Math.max(1, parseInt(limit, 10) || 20);
+  const pageSize = Math.max(1, parseInt(limit, 10) || 50);
   const skip = (currentPage - 1) * pageSize;
 
   const [total, records] = await Promise.all([
@@ -444,13 +513,27 @@ async function getAllOrdersForAdmin({ status, page = 1, limit = 20, search } = {
       where,
       skip,
       take: pageSize,
-      include: { items: true },
+      include: {
+        items: true,
+        user: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+            phoneNumber: true,
+            avatar: true,
+            source: true,
+            role: true,
+            createdAt: true,
+          },
+        },
+      },
       orderBy: { createdAt: 'desc' },
     }),
   ]);
 
   const totalPages = Math.ceil(total / pageSize);
-  const items = records.map(formatOrder);
+  const items = await Promise.all(records.map(formatOrder));
 
   return {
     items,
@@ -466,9 +549,9 @@ async function getAllOrdersForAdmin({ status, page = 1, limit = 20, search } = {
 }
 
 /**
- * Cập nhật trạng thái đơn hàng (Admin)
+ * Cập nhật trạng thái đơn hàng và trạng thái thanh toán (Admin)
  */
-async function updateOrderStatus(id, newStatus) {
+async function updateOrderStatus(id, newStatus, newPaymentStatus = null) {
   if (!id) {
     const error = new Error('Thiếu mã đơn hàng');
     error.statusCode = 400;
@@ -476,19 +559,37 @@ async function updateOrderStatus(id, newStatus) {
   }
 
   const validStatuses = ['PENDING', 'CONFIRMED', 'SHIPPING', 'DELIVERED', 'CANCELLED'];
-  const targetStatus = newStatus ? newStatus.toUpperCase().trim() : '';
+  const updateData = {};
 
-  if (!validStatuses.includes(targetStatus)) {
-    const error = new Error(
-      `Trạng thái không hợp lệ. Các trạng thái được phép: ${validStatuses.join(', ')}`
-    );
+  if (newStatus) {
+    const targetStatus = newStatus.toUpperCase().trim();
+    if (!validStatuses.includes(targetStatus)) {
+      const error = new Error(
+        `Trạng thái đơn hàng không hợp lệ. Các trạng thái được phép: ${validStatuses.join(', ')}`
+      );
+      error.statusCode = 400;
+      throw error;
+    }
+    updateData.orderStatus = targetStatus;
+  }
+
+  if (newPaymentStatus) {
+    const validPaymentStatuses = ['UNPAID', 'PAID', 'REFUNDED'];
+    const targetPayment = newPaymentStatus.toUpperCase().trim();
+    if (validPaymentStatuses.includes(targetPayment)) {
+      updateData.paymentStatus = targetPayment;
+    }
+  }
+
+  if (Object.keys(updateData).length === 0) {
+    const error = new Error('Không có thông tin trạng thái cần cập nhật');
     error.statusCode = 400;
     throw error;
   }
 
   const updated = await prisma.order.update({
     where: { id },
-    data: { orderStatus: targetStatus },
+    data: updateData,
     include: { items: true },
   });
 

@@ -81,12 +81,15 @@ async function reorder(req, res, next) {
  */
 async function getAllOrdersForAdmin(req, res, next) {
   try {
-    const { status, page, limit, search } = req.query;
+    const { status, page, limit, search, source, paymentStatus, customerType } = req.query;
     const result = await orderService.getAllOrdersForAdmin({
       status,
       page,
       limit,
       search,
+      source,
+      paymentStatus,
+      customerType,
     });
     return sendSuccess(res, result, 'Lấy danh sách toàn bộ đơn hàng thành công');
   } catch (error) {
@@ -100,13 +103,13 @@ async function getAllOrdersForAdmin(req, res, next) {
 async function updateOrderStatus(req, res, next) {
   try {
     const { id } = req.params;
-    const { status } = req.body;
+    const { status, paymentStatus } = req.body;
 
-    if (!status) {
-      return sendError(res, 'Vui lòng cung cấp trạng thái mới (status)', 400);
+    if (!status && !paymentStatus) {
+      return sendError(res, 'Vui lòng cung cấp trạng thái mới (status hoặc paymentStatus)', 400);
     }
 
-    const updated = await orderService.updateOrderStatus(id, status);
+    const updated = await orderService.updateOrderStatus(id, status, paymentStatus);
     return sendSuccess(res, updated, 'Cập nhật trạng thái đơn hàng thành công');
   } catch (error) {
     next(error);

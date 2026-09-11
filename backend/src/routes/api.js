@@ -19,6 +19,7 @@ const adminCustomerRoutes = require('./adminCustomerRoutes');
 const uploadRoutes = require('./uploadRoutes');
 const settingRoutes = require('./settingRoutes');
 const paymentRoutes = require('./paymentRoutes');
+const analyticsRoutes = require('./analyticsRoutes');
 const { sendSuccess } = require('../utils/response');
 
 // Health-check endpoint
@@ -39,6 +40,11 @@ router.get('/health', (req, res) => {
 router.use('/auth', authRoutes);
 router.use('/users', userRoutes);
 router.use('/ai', aiRoutes);
+// Alias hỗ trợ tương thích ngược cho endpoint smart-outfit/ai-stylist
+router.use('/smart-outfit/ai-stylist', (req, res, next) => {
+  req.url = '/chat';
+  return aiRoutes(req, res, next);
+});
 router.use('/categories', categoryRoutes);
 router.use('/styles', styleRoutes);
 router.use('/products', productRoutes);
@@ -54,5 +60,6 @@ router.use('/admin/customers', adminCustomerRoutes);
 router.use('/upload', uploadRoutes);
 router.use('/settings', settingRoutes);
 router.use('/payment', paymentRoutes);
+router.use('/analytics', analyticsRoutes);
 
 module.exports = router;

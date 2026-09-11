@@ -2,12 +2,25 @@ const couponService = require('../services/couponService');
 const { sendSuccess, sendError } = require('../utils/response');
 
 /**
- * Lấy danh sách các mã giảm giá đang kích hoạt
+ * Lấy danh sách các mã giảm giá đang kích hoạt cho Storefront
  */
 async function getActiveCoupons(req, res, next) {
   try {
     const list = await couponService.getActiveCoupons();
     return sendSuccess(res, list, 'Lấy danh sách mã giảm giá thành công');
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Lấy toàn bộ danh sách mã giảm giá cho Admin (kể cả mã tạm dừng)
+ */
+async function getAllCouponsForAdmin(req, res, next) {
+  try {
+    const { status, search } = req.query;
+    const list = await couponService.getAllCouponsForAdmin({ status, search });
+    return sendSuccess(res, list, 'Lấy danh sách toàn bộ mã giảm giá thành công');
   } catch (error) {
     next(error);
   }
@@ -66,6 +79,7 @@ async function deleteCoupon(req, res, next) {
 
 module.exports = {
   getActiveCoupons,
+  getAllCouponsForAdmin,
   validateCoupon,
   createCoupon,
   updateCoupon,

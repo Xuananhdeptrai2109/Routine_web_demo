@@ -6,8 +6,8 @@ const { sendSuccess, sendError } = require('../utils/response');
  */
 async function getCustomers(req, res) {
   try {
-    const { page, limit, search, status, sortBy } = req.query;
-    const result = await customerService.getAllCustomers({ page, limit, search, status, sortBy });
+    const { page, limit, search, status, source, sortBy } = req.query;
+    const result = await customerService.getAllCustomers({ page, limit, search, status, source, sortBy });
     return sendSuccess(res, result, 'Lấy danh sách khách hàng thành công');
   } catch (err) {
     return sendError(res, err.message, err.statusCode || 500);

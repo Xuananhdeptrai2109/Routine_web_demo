@@ -26,29 +26,32 @@ async function authenticate(req, res, next) {
       return sendError(res, 'Token không hợp lệ', 401);
     }
 
+    const targetId = decoded.userId || decoded.id;
     let user = null;
-    try {
-      user = await prisma.user.findUnique({
-        where: { id: decoded.userId },
-        select: {
-          id: true,
-          fullName: true,
-          phoneNumber: true,
-          email: true,
-          role: true,
-          stylePreference: true,
-          createdAt: true,
-          updatedAt: true,
-        },
-      });
-    } catch (err) {
-      // Bỏ qua lỗi DB nếu chạy môi trường test/in-memory
+    if (targetId) {
+      try {
+        user = await prisma.user.findUnique({
+          where: { id: targetId },
+          select: {
+            id: true,
+            fullName: true,
+            phoneNumber: true,
+            email: true,
+            role: true,
+            stylePreference: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        });
+      } catch (err) {
+        // Bỏ qua lỗi DB nếu chạy môi trường test/in-memory
+      }
     }
 
     if (!user) {
       // Fallback từ thông tin mã hóa trong JWT
       user = {
-        id: decoded.userId,
+        id: targetId || 'guest',
         fullName: decoded.fullName || 'Người dùng',
         email: decoded.email,
         phoneNumber: decoded.phoneNumber,
