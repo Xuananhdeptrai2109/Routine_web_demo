@@ -35,11 +35,21 @@ const allowedOrigins = [
   process.env.FRONTEND_URL || 'http://localhost:3000',
   'http://localhost:3000',
   'http://127.0.0.1:3000',
+  'https://*.vercel.app',
 ];
 
 function isAllowedOrigin(origin) {
   if (!origin) return true;
   if (allowedOrigins.includes(origin)) return true;
+
+  try {
+    const hostname = new URL(origin).hostname;
+    if (hostname === 'localhost' || hostname === '127.0.0.1') return true;
+    if (hostname === 'vercel.app' || hostname.endsWith('.vercel.app')) return true;
+  } catch (err) {
+    return false;
+  }
+
   return process.env.NODE_ENV !== 'production' && /^https?:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin);
 }
 

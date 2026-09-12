@@ -1,6 +1,6 @@
 // Routine API Client
-const RAW_API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api/v1';
-const API_BASE = RAW_API_BASE.replace(':5000', ':5001');
+const RAW_API_BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001').replace(/\/+$/, '');
+const API_BASE = RAW_API_BASE.endsWith('/api/v1') ? RAW_API_BASE : `${RAW_API_BASE}/api/v1`;
 
 export async function fetchApi(endpoint, options = {}) {
   const url = `${API_BASE}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;

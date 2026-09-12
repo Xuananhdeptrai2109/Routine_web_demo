@@ -78,11 +78,18 @@ export async function updateCustomerStatus(id, status) {
 
 /**
  * Tạo đường dẫn tiếp thị chuyên biệt cho sản phẩm trên mạng xã hội
+ * Ưu tiên NEXT_PUBLIC_SITE_URL để link luôn dùng đúng domain trên Vercel/production.
  */
 export function generateCampaignUrl({ productId, platform = 'tiktok', campaign = '' }) {
-  if (typeof window === 'undefined') return '';
-  const origin = window.location.origin;
-  const p = platform.toLowerCase();
+  if (!productId) return '';
+
+  const origin = (
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000')
+  ).replace(/\/+$/, '');
+
+  const p = (platform || 'tiktok').toLowerCase();
   const c = campaign ? encodeURIComponent(campaign.trim()) : `${p}_promo`;
+
   return `${origin}/product/${productId}?source=${p}&utm_source=${p}&utm_medium=social&utm_campaign=${c}`;
 }
