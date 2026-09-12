@@ -3,6 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
+    "build": "npx prisma generate",
     "start": "node --watch ./bin/www",
     "dev": "node --watch ./bin/www",
     "export:sql": "node scripts/build_full_sql.js",
