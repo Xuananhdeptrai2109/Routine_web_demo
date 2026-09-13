@@ -159,6 +159,57 @@ const emailService = require('./emailService');
 /**
  * Che giấu một phần email hoặc số điện thoại (Masking)
  */
+/**
+ * Kiểm tra xem Email hoặc Số điện thoại đã được đăng ký chưa
+ */
+async function checkExistence({ email, phoneNumber }) {
+  const cleanEmail = email ? String(email).trim().toLowerCase() : null;
+  const cleanPhone = phoneNumber ? String(phoneNumber).replace(/[\s\-\.]/g, '') : null;
+
+  let existingPhone = null;
+  let existingEmail = null;
+
+  try {
+    if (cleanPhone) {
+      existingPhone = await prisma.user.findUnique({ where: { phoneNumber: cleanPhone } });
+    }
+    if (cleanEmail) {
+      existingEmail = await prisma.user.findUnique({ where: { email: cleanEmail } });
+    }
+  } catch (err) {
+    if (process.env.NODE_ENV === 'production') throw err;
+    if (cleanPhone) {
+      existingPhone = Array.from(mockUsers.values()).find((u) => u.phoneNumber === cleanPhone);
+    }
+    if (cleanEmail) {
+      existingEmail = Array.from(mockUsers.values()).find((u) => u.email === cleanEmail);
+    }
+  }
+
+  const phoneExists = Boolean(existingPhone);
+  const emailExists = Boolean(existingEmail);
+  const exists = phoneExists || emailExists;
+
+  let message = 'Thông tin hợp lệ, có thể tiếp tục đăng ký';
+  if (phoneExists && emailExists) {
+    message = 'Số điện thoại và email này đều đã được đăng ký tài khoản';
+  } else if (phoneExists) {
+    message = 'Số điện thoại này đã được đăng ký tài khoản khác';
+  } else if (emailExists) {
+    message = 'Địa chỉ email này đã được sử dụng';
+  }
+
+  return {
+    exists,
+    phoneExists,
+    emailExists,
+    message,
+  };
+}
+
+/**
+ * Che giấu một phần email hoặc số điện thoại (Masking)
+ */
 function maskIdentifier(val) {
   if (!val) return '';
   const str = String(val).trim();
@@ -173,7 +224,7 @@ function maskIdentifier(val) {
 /**
  * Gửi mã OTP tới Email hoặc Số điện thoại (Đăng ký / Quên mật khẩu)
  */
-async function sendOtp(target, secondaryTarget = null) {
+async function sendOtp(target, secondaryTarget = null, flow = null) {
   if (!target) {
     const error = new Error('Vui lòng cung cấp email hoặc số điện thoại');
     error.statusCode = 400;
@@ -201,17 +252,47 @@ async function sendOtp(target, secondaryTarget = null) {
     console.warn('[authService] DB lookup warning:', dbErr.message);
   }
 
+  // 1. Kiểm tra điều kiện nghiệp vụ theo Flow
+  if (flow === 'register' && user) {
+    const isEmailMatch = user.email && (user.email === cleanId || user.email === cleanAlt);
+    const errMsg = isEmailMatch
+      ? 'Địa chỉ email này đã được đăng ký tài khoản. Vui lòng đăng nhập hoặc chọn Quên mật khẩu.'
+      : 'Số điện thoại này đã được đăng ký tài khoản. Vui lòng đăng nhập hoặc chọn Quên mật khẩu.';
+    const error = new Error(errMsg);
+    error.statusCode = 409;
+    throw error;
+  }
+
+  if (flow === 'forgot_password' && !user) {
+    const error = new Error('Không tìm thấy tài khoản với email hoặc số điện thoại này. Vui lòng kiểm tra lại.');
+    error.statusCode = 404;
+    throw error;
+  }
+
   // Sinh mã OTP 6 số ngẫu nhiên
   const code = Math.floor(100000 + Math.random() * 900000).toString();
   const expiresAt = Date.now() + 5 * 60 * 1000; // Hiệu lực 5 phút
 
+  // Giữ lại các mã hợp lệ trước đó chưa hết hạn để nếu user nhận email trễ thì mã nào cũng hợp lệ
+  const existingRecord = otpStore.get(cleanId);
+  const validCodes = [code];
+  if (existingRecord && existingRecord.expiresAt > Date.now()) {
+    if (Array.isArray(existingRecord.validCodes)) {
+      validCodes.push(...existingRecord.validCodes.filter((c) => c !== code));
+    } else if (existingRecord.otp && existingRecord.otp !== code) {
+      validCodes.push(existingRecord.otp);
+    }
+  }
+
   const otpData = {
     otp: code,
+    validCodes,
     user: user || null,
     expiresAt,
     attempts: 0,
     cleanId,
     cleanAlt,
+    flow: flow || null,
   };
 
   otpStore.set(cleanId, otpData);
@@ -257,15 +338,16 @@ async function verifyOtp(target, otp) {
   }
 
   const cleanId = String(target).trim().toLowerCase();
+  const cleanOtp = String(otp || '').trim();
 
   // Các trường hợp mã mô phỏng đặc biệt
-  if (otp === '000000') {
+  if (cleanOtp === '000000') {
     const error = new Error('Mã OTP không chính xác. Vui lòng thử lại.');
     error.statusCode = 400;
     throw error;
   }
 
-  if (otp === '111111') {
+  if (cleanOtp === '111111') {
     const error = new Error('Mã OTP đã hết hạn.');
     error.statusCode = 400;
     throw error;
@@ -286,8 +368,12 @@ async function verifyOtp(target, otp) {
     }
   }
 
-  // Chấp nhận nếu khớp OTP đã gửi hoặc mã mặc định dev '123456'
-  const isMatch = (record && record.otp === otp) || otp === '123456';
+  // Chấp nhận nếu khớp OTP chính, hoặc nằm trong danh sách validCodes unexpired, hoặc mã bypass dev '123456'
+  const isMatch =
+    (record &&
+      (record.otp === cleanOtp ||
+        (Array.isArray(record.validCodes) && record.validCodes.includes(cleanOtp)))) ||
+    cleanOtp === '123456';
 
   if (!isMatch) {
     if (record) {
@@ -539,6 +625,7 @@ module.exports = {
   sanitizeUser,
   registerUser,
   loginUser,
+  checkExistence,
   sendOtp,
   verifyOtp,
   resetPassword,

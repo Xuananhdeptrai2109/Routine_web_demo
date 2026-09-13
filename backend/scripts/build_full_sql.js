@@ -384,10 +384,132 @@ CREATE TABLE \`newsletter_subscribers\` (
 DROP TABLE IF EXISTS \`store_settings\`;
 CREATE TABLE \`store_settings\` (
   \`setting_key\` VARCHAR(100) NOT NULL,
-  \`setting_value\` TEXT NOT NULL,
+  \`setting_value\` LONGTEXT NOT NULL,
   \`description\` VARCHAR(255) DEFAULT NULL,
   \`updated_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (\`setting_key\`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------------------------
+-- Table 17: \`media_files\`
+-- ------------------------------------------------------------------------------
+DROP TABLE IF EXISTS \`media_files\`;
+CREATE TABLE \`media_files\` (
+  \`id\` VARCHAR(191) NOT NULL,
+  \`filename\` VARCHAR(255) NOT NULL,
+  \`mimetype\` VARCHAR(100) NOT NULL,
+  \`size\` INT NOT NULL,
+  \`data\` LONGBLOB NOT NULL,
+  \`created_at\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (\`id\`),
+  KEY \`idx_media_filename\` (\`filename\`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------------------------
+-- Table 18: \`carts\` & \`cart_items\`
+-- ------------------------------------------------------------------------------
+DROP TABLE IF EXISTS \`cart_items\`;
+DROP TABLE IF EXISTS \`carts\`;
+CREATE TABLE \`carts\` (
+  \`id\` VARCHAR(191) NOT NULL,
+  \`user_id\` VARCHAR(191) DEFAULT NULL,
+  \`guest_session_id\` VARCHAR(191) DEFAULT NULL,
+  \`applied_coupon\` VARCHAR(50) DEFAULT NULL,
+  \`created_at\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  \`updated_at\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (\`id\`),
+  UNIQUE KEY \`uk_carts_user\` (\`user_id\`),
+  UNIQUE KEY \`uk_carts_guest\` (\`guest_session_id\`),
+  CONSTRAINT \`fk_carts_user\` FOREIGN KEY (\`user_id\`) REFERENCES \`users\` (\`id\`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE \`cart_items\` (
+  \`id\` VARCHAR(191) NOT NULL,
+  \`cart_id\` VARCHAR(191) NOT NULL,
+  \`product_id\` VARCHAR(191) NOT NULL,
+  \`line_id\` VARCHAR(191) NOT NULL,
+  \`name\` VARCHAR(255) NOT NULL,
+  \`category\` VARCHAR(100) DEFAULT NULL,
+  \`gender\` VARCHAR(50) DEFAULT NULL,
+  \`price\` INT NOT NULL,
+  \`original_price\` INT DEFAULT NULL,
+  \`image\` VARCHAR(500) DEFAULT NULL,
+  \`size\` VARCHAR(50) DEFAULT NULL,
+  \`color\` VARCHAR(50) DEFAULT NULL,
+  \`quantity\` INT NOT NULL DEFAULT 1,
+  \`created_at\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  \`updated_at\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (\`id\`),
+  UNIQUE KEY \`uk_cart_line\` (\`cart_id\`, \`line_id\`),
+  CONSTRAINT \`fk_cart_items_cart\` FOREIGN KEY (\`cart_id\`) REFERENCES \`carts\` (\`id\`) ON DELETE CASCADE,
+  CONSTRAINT \`fk_cart_items_product\` FOREIGN KEY (\`product_id\`) REFERENCES \`products\` (\`id\`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------------------------
+-- Table 19: \`wishlists\` & \`wishlist_items\`
+-- ------------------------------------------------------------------------------
+DROP TABLE IF EXISTS \`wishlist_items\`;
+DROP TABLE IF EXISTS \`wishlists\`;
+CREATE TABLE \`wishlists\` (
+  \`id\` VARCHAR(191) NOT NULL,
+  \`user_id\` VARCHAR(191) DEFAULT NULL,
+  \`guest_session_id\` VARCHAR(191) DEFAULT NULL,
+  \`created_at\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  \`updated_at\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (\`id\`),
+  UNIQUE KEY \`uk_wishlists_user\` (\`user_id\`),
+  UNIQUE KEY \`uk_wishlists_guest\` (\`guest_session_id\`),
+  CONSTRAINT \`fk_wishlists_user\` FOREIGN KEY (\`user_id\`) REFERENCES \`users\` (\`id\`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE \`wishlist_items\` (
+  \`id\` VARCHAR(191) NOT NULL,
+  \`wishlist_id\` VARCHAR(191) NOT NULL,
+  \`product_id\` VARCHAR(191) NOT NULL,
+  \`created_at\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (\`id\`),
+  UNIQUE KEY \`uk_wishlist_item\` (\`wishlist_id\`, \`product_id\`),
+  CONSTRAINT \`fk_wishlist_items_wishlist\` FOREIGN KEY (\`wishlist_id\`) REFERENCES \`wishlists\` (\`id\`) ON DELETE CASCADE,
+  CONSTRAINT \`fk_wishlist_items_product\` FOREIGN KEY (\`product_id\`) REFERENCES \`products\` (\`id\`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------------------------
+-- Table 20: \`stock_reservations\`
+-- ------------------------------------------------------------------------------
+DROP TABLE IF EXISTS \`stock_reservations\`;
+CREATE TABLE \`stock_reservations\` (
+  \`id\` VARCHAR(191) NOT NULL,
+  \`order_id\` VARCHAR(191) NOT NULL,
+  \`items\` JSON NOT NULL,
+  \`expires_at\` DATETIME(3) NOT NULL,
+  \`created_at\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (\`id\`),
+  UNIQUE KEY \`uk_reservations_order\` (\`order_id\`),
+  KEY \`idx_reservations_expires\` (\`expires_at\`),
+  CONSTRAINT \`fk_reservations_order\` FOREIGN KEY (\`order_id\`) REFERENCES \`orders\` (\`id\`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------------------------
+-- Table 21: \`traffic_logs\`
+-- ------------------------------------------------------------------------------
+DROP TABLE IF EXISTS \`traffic_logs\`;
+CREATE TABLE \`traffic_logs\` (
+  \`id\` VARCHAR(191) NOT NULL,
+  \`platform\` VARCHAR(50) NOT NULL,
+  \`campaign\` VARCHAR(255) DEFAULT NULL,
+  \`product_id\` VARCHAR(191) DEFAULT NULL,
+  \`guest_session_id\` VARCHAR(191) DEFAULT NULL,
+  \`user_id\` VARCHAR(191) DEFAULT NULL,
+  \`action\` VARCHAR(50) NOT NULL DEFAULT 'VIEW',
+  \`metadata\` JSON DEFAULT NULL,
+  \`ip_address\` VARCHAR(100) DEFAULT NULL,
+  \`created_at\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (\`id\`),
+  KEY \`idx_traffic_platform\` (\`platform\`),
+  KEY \`idx_traffic_guest\` (\`guest_session_id\`),
+  KEY \`idx_traffic_user\` (\`user_id\`),
+  KEY \`idx_traffic_product\` (\`product_id\`),
+  KEY \`idx_traffic_created\` (\`created_at\`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 \n-- ==============================================================================

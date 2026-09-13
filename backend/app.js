@@ -84,13 +84,20 @@ app.use(express.static(path.join(__dirname, 'public'), {
 // Tắt tính năng tự động tạo ETag để tránh phản hồi 304 Not Modified khiến client hiểu lầm là lỗi
 app.set('etag', false);
 
-// Middleware chống cache cho API để luôn trả về dữ liệu mới nhất (HTTP 200 OK)
+// Middleware chống cache cho API JSON (loại trừ media/ảnh để cho phép HTTP caching)
 app.use((req, res, next) => {
+  if (req.path.startsWith('/api/v1/media') || req.path.startsWith('/uploads')) {
+    return next();
+  }
   res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   res.set('Pragma', 'no-cache');
   res.set('Expires', '0');
   next();
 });
+
+// Phục vụ ảnh từ Database nếu truy cập trực tiếp /uploads/:id
+const mediaController = require('./src/controllers/mediaController');
+app.get('/uploads/:id', mediaController.serveMedia);
 
 // Áp dụng Rate Limiter cho các endpoint nhạy cảm và toàn bộ API
 app.use('/api/v1/auth', authLimiter);

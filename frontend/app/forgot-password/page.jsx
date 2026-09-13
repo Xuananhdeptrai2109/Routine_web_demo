@@ -34,7 +34,7 @@ export default function ForgotPasswordPage() {
     setIsLoading(true);
     setServerError("");
 
-    const res = await sendOtp(trimmedInput);
+    const res = await sendOtp(trimmedInput, "forgot_password");
     setIsLoading(false);
 
     if (!res.success) {

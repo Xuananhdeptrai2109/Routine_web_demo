@@ -83,19 +83,59 @@ export async function loginWithPassword(identifier, password) {
 }
 
 /**
+ * Kiểm tra xem Email hoặc Số điện thoại đã được đăng ký trước chưa.
+ * @param {{ email?: string, phone?: string }} params
+ * @returns {Promise<{ success: boolean, exists: boolean, phoneExists: boolean, emailExists: boolean, message: string }>}
+ */
+export async function checkExistence({ email, phone }) {
+  try {
+    const data = await fetchApi("/auth/check-existence", {
+      method: "POST",
+      body: JSON.stringify({ email, phoneNumber: phone }),
+    });
+
+    return {
+      success: true,
+      exists: Boolean(data?.exists),
+      phoneExists: Boolean(data?.phoneExists),
+      emailExists: Boolean(data?.emailExists),
+      message: data?.message || "",
+    };
+  } catch (err) {
+    return {
+      success: false,
+      exists: false,
+      phoneExists: false,
+      emailExists: false,
+      message: err.message || "Không thể kiểm tra thông tin tài khoản.",
+    };
+  }
+}
+
+/**
  * Gửi mã OTP tới email hoặc số điện thoại (Đăng ký / Quên mật khẩu).
  * @param {string} identifier (phone hoặc email)
+ * @param {string|null} flow ('register' | 'forgot_password')
+ * @param {string|null} secondary (phone hoặc email bổ trợ)
  * @returns {Promise<{ success: boolean, message: string, data?: any }>}
  */
-export async function sendOtp(identifier) {
+export async function sendOtp(identifier, flow = null, secondary = null) {
   if (!identifier) {
     return { success: false, message: "Vui lòng nhập email hoặc số điện thoại." };
   }
 
   try {
+    const isEmail = identifier.includes("@");
+    const payload = {
+      identifier: identifier.trim(),
+      flow: flow || undefined,
+      ...(isEmail ? { email: identifier.trim() } : { phoneNumber: identifier.trim() }),
+      ...(secondary ? (secondary.includes("@") ? { email: secondary.trim() } : { phoneNumber: secondary.trim() }) : {}),
+    };
+
     const data = await fetchApi("/auth/send-otp", {
       method: "POST",
-      body: JSON.stringify({ identifier }),
+      body: JSON.stringify(payload),
     });
 
     return {

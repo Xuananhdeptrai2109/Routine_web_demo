@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { IconTikTok, IconFacebook, IconInstagram, IconCopy, IconLink } from "./icons";
-import { generateCampaignUrl } from "@/lib/analyticsService";
+import { generateCampaignUrl, getSiteOrigin } from "@/lib/analyticsService";
 import { getProducts } from "@/lib/adminProductService";
 import { useToast } from "./ToastProvider";
 import styles from "./SocialLinkGeneratorModal.module.css";
@@ -13,10 +13,19 @@ export default function SocialLinkGeneratorModal({ isOpen, onClose, initialProdu
   const [selectedProductId, setSelectedProductId] = useState(initialProductId || "");
   const [platform, setPlatform] = useState("tiktok");
   const [campaign, setCampaign] = useState("");
+  const [customDomain, setCustomDomain] = useState("");
+  const [isEditingDomain, setIsEditingDomain] = useState(false);
+  const [currentOrigin, setCurrentOrigin] = useState("");
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
+      const origin = getSiteOrigin();
+      setCurrentOrigin(origin);
+      if (!customDomain) {
+        setCustomDomain(origin);
+      }
+
       getProducts().then((data) => {
         if (Array.isArray(data)) {
           setProducts(data);
@@ -28,14 +37,19 @@ export default function SocialLinkGeneratorModal({ isOpen, onClose, initialProdu
     }
   }, [isOpen, initialProductId]);
 
+  const effectiveOrigin = useMemo(() => {
+    return (customDomain || currentOrigin || getSiteOrigin()).trim();
+  }, [customDomain, currentOrigin]);
+
   const generatedUrl = useMemo(() => {
     if (!selectedProductId) return "";
     return generateCampaignUrl({
       productId: selectedProductId,
       platform,
       campaign,
+      customDomain: effectiveOrigin,
     });
-  }, [selectedProductId, platform, campaign]);
+  }, [selectedProductId, platform, campaign, effectiveOrigin]);
 
   if (!isOpen) return null;
 
@@ -120,6 +134,45 @@ export default function SocialLinkGeneratorModal({ isOpen, onClose, initialProdu
               value={campaign}
               onChange={(e) => setCampaign(e.target.value)}
             />
+          </div>
+
+          <div className={styles.domainSection}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+              <label className={styles.label} style={{ margin: 0 }}>
+                🌐 Tên miền áp dụng (Domain):
+              </label>
+              <button
+                type="button"
+                className={styles.domainEditToggle}
+                onClick={() => setIsEditingDomain((prev) => !prev)}
+              >
+                {isEditingDomain ? "Đóng tùy chỉnh" : "Đổi tên miền..."}
+              </button>
+            </div>
+            {isEditingDomain ? (
+              <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 4 }}>
+                <input
+                  type="text"
+                  className={styles.input}
+                  placeholder="VD: https://routine.vn hoặc https://your-app.vercel.app"
+                  value={customDomain}
+                  onChange={(e) => setCustomDomain(e.target.value)}
+                />
+                <button
+                  type="button"
+                  className={styles.domainResetBtn}
+                  onClick={() => setCustomDomain(currentOrigin || getSiteOrigin())}
+                  title="Đặt lại về tên miền tự nhận diện hiện tại"
+                >
+                  Tự động
+                </button>
+              </div>
+            ) : (
+              <div className={styles.domainBadge}>
+                <span className={styles.domainDot}></span>
+                <span className={styles.domainText}>{effectiveOrigin || "Đang phát hiện..."}</span>
+              </div>
+            )}
           </div>
 
           <div className={styles.resultBox}>

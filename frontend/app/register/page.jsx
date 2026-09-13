@@ -12,6 +12,7 @@ import PasswordField from "@/components/auth/PasswordField";
 import PasswordStrength from "@/components/auth/PasswordStrength";
 import PrimaryButton from "@/components/auth/PrimaryButton";
 import { useRegistration } from "@/context/RegistrationContext";
+import { checkExistence } from "@/lib/authService";
 import {
   validateEmail,
   validateConfirmPassword,
@@ -35,6 +36,8 @@ export default function RegisterPage() {
 
   const [form, setForm] = useState(initialForm);
   const [touched, setTouched] = useState({});
+  const [isChecking, setIsChecking] = useState(false);
+  const [serverError, setServerError] = useState("");
 
   function updateField(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -59,7 +62,7 @@ export default function RegisterPage() {
     confirmCheck.valid &&
     form.agree;
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
     setTouched({
       name: true,
@@ -70,7 +73,33 @@ export default function RegisterPage() {
       agree: true,
     });
 
-    if (!isFormValid) return;
+    if (!isFormValid || isChecking) return;
+
+    setIsChecking(true);
+    setServerError("");
+
+    try {
+      const check = await checkExistence({
+        email: form.email.trim(),
+        phone: form.phone,
+      });
+
+      if (check.exists) {
+        setIsChecking(false);
+        setServerError(
+          check.phoneExists && check.emailExists
+            ? "Số điện thoại và email này đều đã được đăng ký tài khoản. Vui lòng đăng nhập hoặc chọn Quên mật khẩu."
+            : check.phoneExists
+            ? "Số điện thoại này đã được đăng ký tài khoản khác. Vui lòng kiểm tra lại hoặc đăng nhập."
+            : "Địa chỉ email này đã được sử dụng. Vui lòng kiểm tra lại hoặc đăng nhập."
+        );
+        return;
+      }
+    } catch (err) {
+      console.warn("Lỗi kiểm tra trùng lặp tài khoản:", err);
+    } finally {
+      setIsChecking(false);
+    }
 
     saveAccountInfo({
       name: form.name.trim(),
@@ -179,7 +208,15 @@ export default function RegisterPage() {
           </p>
         )}
 
-        <PrimaryButton type="submit">Tiếp tục</PrimaryButton>
+        {serverError && (
+          <p className={styles.serverError} style={{ marginBottom: "16px" }}>
+            {serverError}
+          </p>
+        )}
+
+        <PrimaryButton type="submit" disabled={isChecking}>
+          {isChecking ? "Đang kiểm tra..." : "Tiếp tục"}
+        </PrimaryButton>
       </form>
 
       <p className={styles.footer}>

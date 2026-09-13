@@ -46,15 +46,28 @@ function saveBase64ToFile(base64Str, prefix = 'img') {
   const filename = `${cleanPrefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
   const buffer = Buffer.from(match[2], 'base64');
 
-  fs.writeFileSync(path.join(BACKEND_UPLOADS_DIR, filename), buffer);
-
+  // Lưu vào Database MySQL (bảng media_files)
   try {
-    fs.writeFileSync(path.join(FRONTEND_UPLOADS_DIR, filename), buffer);
-  } catch (e) {
-    // non-blocking
+    const mediaService = require('../services/mediaService');
+    mediaService.saveMediaFile({
+      filename,
+      mimetype: mime,
+      size: buffer.length,
+      buffer,
+    }).catch((e) => console.warn('[fileStorage] saveMediaFile async warning:', e.message));
+  } catch (dbErr) {
+    console.warn('[fileStorage] DB save error:', dbErr.message);
   }
 
-  return `/uploads/${filename}`;
+  // Tùy chọn lưu trên đĩa (an toàn trên Vercel với try/catch)
+  try {
+    fs.writeFileSync(path.join(BACKEND_UPLOADS_DIR, filename), buffer);
+    fs.writeFileSync(path.join(FRONTEND_UPLOADS_DIR, filename), buffer);
+  } catch (e) {
+    // non-blocking trên Vercel / serverless
+  }
+
+  return `/api/v1/media/${filename}`;
 }
 
 /**

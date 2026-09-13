@@ -14,6 +14,9 @@ router.post('/login', validateLogin, authController.login);
 // GET /api/v1/auth/me (Lấy thông tin tài khoản hiện tại)
 router.get('/me', authenticate, authController.getMe);
 
+// POST /api/v1/auth/check-existence (Kiểm tra email hoặc số điện thoại đã tồn tại chưa)
+router.post('/check-existence', authController.checkExistence);
+
 // POST /api/v1/auth/send-otp (Gửi mã OTP)
 router.post('/send-otp', authController.sendOtp);
 

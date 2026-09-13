@@ -59,15 +59,32 @@ async function getMe(req, res, next) {
 }
 
 /**
+ * Kiểm tra xem Email hoặc Số điện thoại đã được đăng ký chưa
+ */
+async function checkExistence(req, res, next) {
+  try {
+    const { email, phoneNumber, phone } = req.body;
+    const result = await authService.checkExistence({
+      email,
+      phoneNumber: phoneNumber || phone,
+    });
+    return sendSuccess(res, result, result.message, 200);
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
  * Gửi mã OTP (hỗ trợ cả Email và Số điện thoại)
  */
 async function sendOtp(req, res, next) {
   try {
-    const { identifier, email, phoneNumber, phone } = req.body;
+    const { identifier, email, phoneNumber, phone, flow, type } = req.body;
     const target = identifier || email || phoneNumber || phone;
     const secondary = (target === email) ? (phoneNumber || phone) : (email || null);
+    const otpFlow = flow || type || null;
 
-    const result = await authService.sendOtp(target, secondary);
+    const result = await authService.sendOtp(target, secondary, otpFlow);
     return sendSuccess(res, result, result.message || 'Mã OTP đã được gửi');
   } catch (error) {
     next(error);
@@ -155,6 +172,7 @@ module.exports = {
   register,
   login,
   getMe,
+  checkExistence,
   sendOtp,
   verifyOtp,
   resetPassword,

@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import AuthLayout from "@/components/auth/AuthLayout";
 import AuthHeader from "@/components/auth/AuthHeader";
 import StepIndicator from "@/components/auth/StepIndicator";
@@ -27,6 +28,7 @@ function VerifyOtpContent() {
   const email = searchParams.get("email") || data.email || "";
   const phone = searchParams.get("phone") || data.phone || "";
   const target = email || phone || "";
+  const secondary = target === email ? phone : email;
 
   const [otp, setOtp] = useState("");
   const [error, setError] = useState("");
@@ -37,13 +39,19 @@ function VerifyOtpContent() {
   useEffect(() => {
     if (target && !otpSentRef.current) {
       otpSentRef.current = true;
-      sendOtp(target).catch(() => {});
+      sendOtp(target, flow, secondary)
+        .then((res) => {
+          if (!res.success) {
+            setError(res.message);
+          }
+        })
+        .catch(() => {});
     }
-  }, [target]);
+  }, [target, flow, secondary]);
 
   async function handleResend() {
     setError("");
-    const res = await sendOtp(target);
+    const res = await sendOtp(target, flow, secondary);
     if (!res.success) {
       setError(res.message || "Không thể gửi lại mã OTP.");
     }
@@ -141,7 +149,18 @@ function VerifyOtpContent() {
               />
             </div>
 
-            {error && <ErrorMessage id="otp-error">{error}</ErrorMessage>}
+            {error && (
+              <div style={{ marginTop: "12px", textAlign: "center" }}>
+                <ErrorMessage id="otp-error">{error}</ErrorMessage>
+                {error.includes("đã được") && (
+                  <p style={{ marginTop: "8px", fontSize: "14px" }}>
+                    <Link href="/login" style={{ color: "var(--color-primary, #000)", fontWeight: 600, textDecoration: "underline" }}>
+                      👉 Bấm vào đây để đăng nhập ngay
+                    </Link>
+                  </p>
+                )}
+              </div>
+            )}
 
             <div className={styles.countdownRow}>
               <CountdownTimer seconds={45} onResend={handleResend} disabled={isVerifying} />

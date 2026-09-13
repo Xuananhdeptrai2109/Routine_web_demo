@@ -344,3 +344,16 @@ model StoreSetting {
   @@map("store_settings")
 }
 
+model MediaFile {
+  id        String   @id @db.VarChar(191)
+  filename  String   @db.VarChar(255)
+  mimetype  String   @db.VarChar(100)
+  size      Int
+  data      Bytes
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([filename])
+  @@map("media_files")
+}
+
+

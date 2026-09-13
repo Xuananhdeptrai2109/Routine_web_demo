@@ -1,38 +1,24 @@
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const mediaService = require('../services/mediaService');
 const { sendSuccess, sendError } = require('../utils/response');
 
-// Thư mục lưu trữ ảnh tải lên
-const uploadDir = path.resolve(__dirname, '../../public/uploads');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
+// Sử dụng memoryStorage để lưu file vào Buffer trong RAM, tương thích 100% với môi trường Serverless / Vercel
+const storage = multer.memoryStorage();
 
-// Cấu hình storage
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, uploadDir);
-  },
-  filename: function (req, file, cb) {
-    const extensions = {
-      'image/jpeg': '.jpg',
-      'image/png': '.png',
-      'image/webp': '.webp',
-      'image/avif': '.avif',
-      'image/gif': '.gif',
-    };
-    const ext = extensions[file.mimetype] || '.jpg';
-    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-    cb(null, `img-${uniqueSuffix}${ext}`);
-  },
-});
-
-// Cho phép tải lên bất kỳ định dạng ảnh nào (JPEG, PNG, WEBP, AVIF, HEIC, HEIF, GIF, SVG, BMP, TIFF, JFIF, RAW...)
+// Cho phép tải lên bất kỳ định dạng ảnh nào
 function fileFilter(req, file, cb) {
-  const allowedMimeTypes = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/gif']);
+  const allowedMimeTypes = new Set([
+    'image/jpeg',
+    'image/png',
+    'image/webp',
+    'image/avif',
+    'image/gif',
+    'image/svg+xml',
+  ]);
   if (!allowedMimeTypes.has(file.mimetype)) {
-    const error = new Error('Chỉ chấp nhận file ảnh JPEG, PNG, WEBP, AVIF hoặc GIF');
+    const error = new Error('Chỉ chấp nhận file ảnh JPEG, PNG, WEBP, AVIF, SVG hoặc GIF');
     error.statusCode = 400;
     return cb(error);
   }
@@ -48,29 +34,61 @@ const upload = multer({
 });
 
 /**
- * Xử lý sau khi upload thành công
+ * Xử lý sau khi upload thành công: Lưu trực tiếp vào Database MySQL (bảng media_files)
  */
-function handleUploadSuccess(req, res) {
-  if (!req.file) {
-    return sendError(res, 'Vui lòng chọn file hình ảnh cần tải lên', 400);
-  }
+async function handleUploadSuccess(req, res, next) {
+  try {
+    if (!req.file) {
+      return sendError(res, 'Vui lòng chọn file hình ảnh cần tải lên', 400);
+    }
 
-  const fileUrl = `/uploads/${req.file.filename}`;
-  const { syncUploadedFile } = require('../utils/fileStorage');
-  syncUploadedFile(req.file.filename);
+    const extensions = {
+      'image/jpeg': '.jpg',
+      'image/png': '.png',
+      'image/webp': '.webp',
+      'image/avif': '.avif',
+      'image/gif': '.gif',
+      'image/svg+xml': '.svg',
+    };
+    const ext = extensions[req.file.mimetype] || path.extname(req.file.originalname) || '.jpg';
+    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+    const filename = `img-${uniqueSuffix}${ext}`;
 
-  return sendSuccess(
-    res,
-    {
-      url: fileUrl,
-      filename: req.file.filename,
-      originalName: req.file.originalname,
-      size: req.file.size,
+    // 1. Lưu file vào Database MySQL
+    const saved = await mediaService.saveMediaFile({
+      filename,
       mimetype: req.file.mimetype,
-    },
-    'Tải hình ảnh lên thành công',
-    201
-  );
+      size: req.file.size,
+      buffer: req.file.buffer,
+    });
+
+    // 2. Lưu phụ bản trên đĩa nếu môi trường local cho phép
+    try {
+      const uploadDir = path.resolve(__dirname, '../../public/uploads');
+      if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+      }
+      fs.writeFileSync(path.join(uploadDir, filename), req.file.buffer);
+    } catch (diskErr) {
+      // Bỏ qua trên Vercel / Read-Only filesystem
+    }
+
+    return sendSuccess(
+      res,
+      {
+        url: saved.url,
+        id: saved.id,
+        filename,
+        originalName: req.file.originalname,
+        size: req.file.size,
+        mimetype: req.file.mimetype,
+      },
+      'Tải hình ảnh lên thành công',
+      201
+    );
+  } catch (err) {
+    next(err);
+  }
 }
 
 module.exports = {

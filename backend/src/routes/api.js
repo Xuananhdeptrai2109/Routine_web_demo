@@ -17,6 +17,7 @@ const couponRoutes = require('./couponRoutes');
 const styleRoutes = require('./styleRoutes');
 const adminCustomerRoutes = require('./adminCustomerRoutes');
 const uploadRoutes = require('./uploadRoutes');
+const mediaRoutes = require('./mediaRoutes');
 const settingRoutes = require('./settingRoutes');
 const paymentRoutes = require('./paymentRoutes');
 const analyticsRoutes = require('./analyticsRoutes');
@@ -58,6 +59,8 @@ router.use('/reviews', reviewRoutes);
 router.use('/coupons', couponRoutes);
 router.use('/admin/customers', adminCustomerRoutes);
 router.use('/upload', uploadRoutes);
+router.use('/media', mediaRoutes);
+router.use('/uploads', mediaRoutes); // Alias tương thích ngược
 router.use('/settings', settingRoutes);
 router.use('/payment', paymentRoutes);
 router.use('/analytics', analyticsRoutes);
