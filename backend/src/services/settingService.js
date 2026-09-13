@@ -15,11 +15,11 @@ const DEFAULT_HERO_CONFIG = {
 
 async function ensureStoreSettingsTable() {
   await prisma.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS store_settings (
-      setting_key VARCHAR(191) NOT NULL PRIMARY KEY,
-      setting_value LONGTEXT NOT NULL,
-      description VARCHAR(255) NULL,
-      updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)
+    CREATE TABLE IF NOT EXISTS \`store_settings\` (
+      \`setting_key\` VARCHAR(191) NOT NULL PRIMARY KEY,
+      \`setting_value\` LONGTEXT NOT NULL,
+      \`description\` VARCHAR(255) NULL,
+      \`updated_at\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)
     ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
   `);
 }
@@ -31,7 +31,8 @@ async function getHeroBanners() {
   try {
     await ensureStoreSettingsTable();
     const rows = await prisma.$queryRawUnsafe(
-      'SELECT setting_value FROM store_settings WHERE setting_key = "home_hero_banners" LIMIT 1;'
+      'SELECT `setting_value` FROM `store_settings` WHERE `setting_key` = ? LIMIT 1;',
+      'home_hero_banners'
     );
     if (rows && rows.length > 0 && rows[0].setting_value) {
       const parsed = JSON.parse(rows[0].setting_value);
@@ -79,9 +80,12 @@ async function updateHeroBanners(payload) {
   const jsonStr = JSON.stringify(nextConfig);
 
   await prisma.$executeRawUnsafe(
-    `INSERT INTO store_settings (setting_key, setting_value, description, updated_at)
-     VALUES ("home_hero_banners", ?, "Cấu hình Hero Banner toàn màn hình & Slide Trang chủ", NOW())
-     ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value), updated_at = NOW();`,
+    `INSERT INTO \`store_settings\` (\`setting_key\`, \`setting_value\`, \`description\`, \`updated_at\`)
+     VALUES (?, ?, ?, NOW())
+     ON DUPLICATE KEY UPDATE \`setting_value\` = ?, \`updated_at\` = NOW();`,
+    'home_hero_banners',
+    jsonStr,
+    'Cấu hình Hero Banner toàn màn hình & Slide Trang chủ',
     jsonStr
   );
 
