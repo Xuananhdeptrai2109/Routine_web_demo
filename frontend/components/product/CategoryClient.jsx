@@ -111,8 +111,8 @@ export default function CategoryClient({ initialCategory, initialProducts = [], 
         <aside className="category-sidebar desktop-only">
           <ProductFilter
             facets={facets}
-            selectedFilters={filters}
-            onFilterChange={setFilters}
+            filters={filters}
+            onChange={setFilters}
           />
         </aside>
 
@@ -125,8 +125,8 @@ export default function CategoryClient({ initialCategory, initialProducts = [], 
         <Modal title="Bộ lọc sản phẩm" onClose={() => setMobileFilterOpen(false)}>
           <ProductFilter
             facets={facets}
-            selectedFilters={filters}
-            onFilterChange={setFilters}
+            filters={filters}
+            onChange={setFilters}
           />
           <div style={{ marginTop: 24 }}>
             <button

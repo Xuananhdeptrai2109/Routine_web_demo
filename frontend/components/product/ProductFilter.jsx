@@ -32,11 +32,20 @@ function FacetGroup({ title, options, activeValue, onSelect }) {
   );
 }
 
-export default function ProductFilter({ facets, filters, onChange, onReset }) {
+export default function ProductFilter({
+  facets,
+  filters,
+  selectedFilters,
+  onChange,
+  onFilterChange,
+  onReset,
+}) {
+  const activeFilters = filters || selectedFilters || {};
+  const handleChange = onChange || onFilterChange || (() => {});
   const { categories = [], sizes = [], colors = [], styles = [] } = facets || {};
 
   function update(key, value) {
-    onChange({ ...filters, [key]: value });
+    handleChange({ ...activeFilters, [key]: value });
   }
 
   return (
@@ -51,31 +60,31 @@ export default function ProductFilter({ facets, filters, onChange, onReset }) {
       <FacetGroup
         title="Category"
         options={categories.map((c) => ({ label: c, value: c }))}
-        activeValue={filters.category}
+        activeValue={activeFilters.category}
         onSelect={(v) => update("category", v)}
       />
       <FacetGroup
         title="Size"
         options={sizes.map((s) => ({ label: s, value: s }))}
-        activeValue={filters.size}
+        activeValue={activeFilters.size}
         onSelect={(v) => update("size", v)}
       />
       <FacetGroup
         title="Color"
         options={colors.map((c) => ({ label: c, value: c }))}
-        activeValue={filters.color}
+        activeValue={activeFilters.color}
         onSelect={(v) => update("color", v)}
       />
       <FacetGroup
         title="Style"
         options={styles.map((s) => ({ label: s, value: s }))}
-        activeValue={filters.style}
+        activeValue={activeFilters.style}
         onSelect={(v) => update("style", v)}
       />
       <FacetGroup
         title="Price"
         options={priceRanges.map((p) => ({ label: p.label, value: p.label }))}
-        activeValue={filters.priceLabel}
+        activeValue={activeFilters.priceLabel}
         onSelect={(v) => update("priceLabel", v)}
       />
     </div>
