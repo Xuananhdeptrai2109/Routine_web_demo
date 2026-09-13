@@ -72,9 +72,11 @@ async function authenticate(req, res, next) {
  */
 function authorizeAdmin(req, res, next) {
   if (!req.user || req.user.role !== 'ADMIN') {
+    const currentEmail = req.user?.email || 'Chưa xác định';
+    const currentRole = req.user?.role || 'CUSTOMER';
     return sendError(
       res,
-      'Truy cập bị từ chối: Thao tác này yêu cầu quyền Quản trị viên (Admin)',
+      `Truy cập bị từ chối (403): Thao tác này yêu cầu quyền Quản trị viên (ADMIN). Tài khoản hiện tại (${currentEmail}) đang có vai trò là '${currentRole}'. Vui lòng đăng nhập tài khoản admin@routine.vn hoặc nâng quyền tài khoản này thành ADMIN trong Database.`,
       403
     );
   }

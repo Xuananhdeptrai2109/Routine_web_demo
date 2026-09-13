@@ -1,5 +1,6 @@
-// Upload service để tải ảnh trực tiếp lên server, lưu file vật lý và trả về URL
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api/v1';
+// Upload service để tải ảnh lên server, lưu trực tiếp vào Database MySQL (bảng media_files)
+const RAW_API_BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001').replace(/\/+$/, '');
+const API_BASE = RAW_API_BASE.endsWith('/api/v1') ? RAW_API_BASE : `${RAW_API_BASE}/api/v1`;
 
 export async function uploadImageFile(file) {
   if (!file) throw new Error("Chưa chọn file hình ảnh");
@@ -10,11 +11,24 @@ export async function uploadImageFile(file) {
   let token = null;
   if (typeof window !== 'undefined') {
     const stored = localStorage.getItem('routine_token') || localStorage.getItem('token');
-    if (stored) token = stored;
+    if (stored) {
+      try {
+        const parts = stored.split('.');
+        if (parts.length === 3) {
+          const payload = JSON.parse(atob(parts[1]));
+          const notExpired = !payload.exp || payload.exp * 1000 > Date.now();
+          if (notExpired) {
+            token = stored;
+          }
+        }
+      } catch (e) {
+        token = stored;
+      }
+    }
   }
 
   if (!token) {
-    throw new Error('Phiên đăng nhập Admin đã hết hạn. Vui lòng đăng nhập lại.');
+    throw new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
   }
 
   const res = await fetch(`${API_BASE}/upload/image`, {
@@ -27,7 +41,8 @@ export async function uploadImageFile(file) {
 
   const json = await res.json().catch(() => null);
   if (!res.ok) {
-    throw new Error(json?.message || `Lỗi tải ảnh (${res.status})`);
+    const errorMsg = json?.message || `Lỗi tải ảnh (${res.status})`;
+    throw new Error(errorMsg);
   }
 
   return json?.data?.url || json?.url;
