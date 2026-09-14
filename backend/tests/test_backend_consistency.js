@@ -1,5 +1,5 @@
 const http = require('http');
-const app = require('./app');
+const app = require('../app');
 
 const server = http.createServer(app);
 const TEST_PORT = 5005;
@@ -123,7 +123,7 @@ server.listen(TEST_PORT, async () => {
     // 8. Auth: Send OTP
     const otpRes = await request('/api/v1/auth/send-otp', {
       method: 'POST',
-      body: { phone: '0987654321' },
+      body: { phone: '0901234567' },
     });
     assert(
       otpRes.status === 200 && otpRes.body.success === true,
@@ -133,7 +133,7 @@ server.listen(TEST_PORT, async () => {
     // 9. Auth: Verify OTP
     const verifyRes = await request('/api/v1/auth/verify-otp', {
       method: 'POST',
-      body: { phone: '0987654321', otp: '123456' },
+      body: { phone: '0901234567', otp: '123456' },
     });
     assert(
       verifyRes.status === 200 && verifyRes.body.data.verified === true,
@@ -143,7 +143,7 @@ server.listen(TEST_PORT, async () => {
     // 10. Auth: Reset Password
     const resetRes = await request('/api/v1/auth/reset-password', {
       method: 'POST',
-      body: { phone: '0987654321', password: 'newpassword123' },
+      body: { phone: '0901234567', password: 'newpassword123' },
     });
     assert(
       resetRes.status === 200 && resetRes.body.success === true,
@@ -151,11 +151,10 @@ server.listen(TEST_PORT, async () => {
     );
 
     // 11. Orders: POST /api/v1/orders (Create Order)
+    const consistencySession = 'session-consistency-test';
     const orderCreate = await request('/api/v1/orders', {
       method: 'POST',
-      headers: {
-        'x-session-id': 'test-session-123',
-      },
+      headers: { 'x-session-id': consistencySession },
       body: {
         items: [
           {
@@ -170,7 +169,7 @@ server.listen(TEST_PORT, async () => {
         ],
         shippingAddress: {
           name: 'Trần Văn B',
-          phone: '0911223344',
+          phone: '0901234567',
           address: '456 Hai Bà Trưng',
           city: 'Hà Nội',
           district: 'Hoàn Kiếm',
@@ -190,7 +189,9 @@ server.listen(TEST_PORT, async () => {
     const createdOrderId = orderCreate.body.data.id;
 
     // 12. Orders: GET /api/v1/orders
-    const orderList = await request('/api/v1/orders');
+    const orderList = await request('/api/v1/orders', {
+      headers: { 'x-session-id': consistencySession },
+    });
     assert(
       orderList.status === 200 &&
         Array.isArray(orderList.body.data.items) &&
@@ -219,12 +220,12 @@ server.listen(TEST_PORT, async () => {
     // 15. Orders: POST /api/v1/orders/:id/reorder
     const reorderRes = await request(`/api/v1/orders/${createdOrderId}/reorder`, {
       method: 'POST',
-      headers: {
-        'x-session-id': 'test-session-123',
-      },
+      headers: { 'x-session-id': consistencySession },
     });
     assert(
-      reorderRes.status === 200 && reorderRes.body.data.items.length > 0,
+      reorderRes.status === 200 &&
+        reorderRes.body.data.items.length > 0 &&
+        reorderRes.body.data.items.some((i) => i.productId === 'p001'),
       'POST /api/v1/orders/:id/reorder adds items back to cart'
     );
 

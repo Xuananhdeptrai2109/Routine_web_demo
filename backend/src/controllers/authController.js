@@ -6,13 +6,14 @@ const { sendSuccess, sendError } = require('../utils/response');
  */
 async function register(req, res, next) {
   try {
-    const { fullName, phoneNumber, email, password, stylePreference, source, attributionSource } = req.body;
+    const { fullName, phoneNumber, email, password, gender, stylePreference, source, attributionSource } = req.body;
 
     const result = await authService.registerUser({
       fullName,
       phoneNumber,
       email,
       password,
+      gender: gender || 'unisex',
       stylePreference,
       source: source || attributionSource || 'ORGANIC',
     });

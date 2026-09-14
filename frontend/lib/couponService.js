@@ -21,6 +21,16 @@ export async function fetchActiveCoupons() {
 }
 
 /**
+ * Kiểm tra tính hợp lệ của mã giảm giá với giá trị đơn hàng (Storefront)
+ */
+export async function validateCouponApi(code, subtotal) {
+  return await fetchApi("/coupons/validate", {
+    method: "POST",
+    body: JSON.stringify({ code, subtotal }),
+  });
+}
+
+/**
  * Tạo mã giảm giá mới (Admin)
  */
 export async function createCoupon(couponData) {

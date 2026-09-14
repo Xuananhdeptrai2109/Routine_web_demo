@@ -3,7 +3,7 @@
 import { formatPrice } from "@/lib/format";
 import { getShippingFee } from "@/lib/checkoutConstants";
 
-export default function PaymentSummary({ subtotal, shippingMethod, discount = 0, onPlaceOrder, isProcessing, error }) {
+export default function PaymentSummary({ subtotal, shippingMethod, discount = 0, voucherCode = "", onPlaceOrder, isProcessing, error }) {
   const shipping = getShippingFee(shippingMethod);
   const total = Math.max(subtotal + shipping - discount, 0);
 
@@ -21,7 +21,7 @@ export default function PaymentSummary({ subtotal, shippingMethod, discount = 0,
       </div>
       {discount > 0 && (
         <div className="payment-summary-row" style={{ color: "var(--color-success)" }}>
-          <span>Discount</span>
+          <span>Discount {voucherCode ? `(${voucherCode})` : ""}</span>
           <span>-{formatPrice(discount)}</span>
         </div>
       )}

@@ -37,6 +37,10 @@ function VerifyOtpContent() {
   const otpSentRef = useRef(false);
 
   useEffect(() => {
+    if (flow === "register") {
+      router.replace("/register");
+      return;
+    }
     if (target && !otpSentRef.current) {
       otpSentRef.current = true;
       sendOtp(target, flow, secondary)
@@ -47,7 +51,7 @@ function VerifyOtpContent() {
         })
         .catch(() => {});
     }
-  }, [target, flow, secondary]);
+  }, [target, flow, secondary, router]);
 
   async function handleResend() {
     setError("");

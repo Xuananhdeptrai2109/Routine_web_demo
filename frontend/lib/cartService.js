@@ -3,12 +3,15 @@
 
 import { fetchApi } from "./api";
 
-const CART_STORAGE_KEY = "routine_cart_v1";
+export function getCartStorageKey(userId = null) {
+  return userId ? `routine_cart_user_${userId}` : "routine_cart_guest";
+}
 
-export function loadCart() {
+export function loadCart(userId = null) {
   if (typeof window === "undefined") return [];
   try {
-    const raw = window.localStorage.getItem(CART_STORAGE_KEY);
+    const key = getCartStorageKey(userId);
+    const raw = window.localStorage.getItem(key);
     return raw ? JSON.parse(raw) : [];
   } catch (err) {
     console.error("Failed to load cart from storage", err);
@@ -16,12 +19,26 @@ export function loadCart() {
   }
 }
 
-export function saveCart(items) {
+export function saveCart(items, userId = null) {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
+    const key = getCartStorageKey(userId);
+    window.localStorage.setItem(key, JSON.stringify(items || []));
   } catch (err) {
     console.error("Failed to save cart to storage", err);
+  }
+}
+
+export function clearLocalCart(userId = null) {
+  if (typeof window === "undefined") return;
+  try {
+    if (userId) {
+      window.localStorage.removeItem(`routine_cart_user_${userId}`);
+    }
+    window.localStorage.removeItem("routine_cart_guest");
+    window.localStorage.removeItem("routine_cart_v1");
+  } catch (err) {
+    console.error("Failed to clear local cart from storage", err);
   }
 }
 

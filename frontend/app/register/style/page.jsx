@@ -8,6 +8,8 @@ import StepIndicator from "@/components/auth/StepIndicator";
 import StyleGrid from "@/components/auth/StyleGrid";
 import PrimaryButton from "@/components/auth/PrimaryButton";
 import { useRegistration } from "@/context/RegistrationContext";
+import { useUser } from "@/context/UserContext";
+import { register as registerUser } from "@/lib/authService";
 import styles from "./page.module.css";
 import styleList from "@/data/styles";
 import { getStyles } from "@/lib/styleService";
@@ -16,9 +18,13 @@ const MAX_STYLES = 3;
 
 export default function RegisterStylePage() {
   const router = useRouter();
-  const { data, isHydrated, saveSelectedStyles } = useRegistration();
+  const { data, isHydrated, saveSelectedStyles, clearRegistrationData } = useRegistration();
+  const { login } = useUser();
   const [selectedIds, setSelectedIds] = useState([]);
   const [availableStyles, setAvailableStyles] = useState(styleList);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [serverError, setServerError] = useState("");
+  const [isSuccess, setIsSuccess] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -45,10 +51,10 @@ export default function RegisterStylePage() {
   // từ sessionStorage trước khi kiểm tra, để tránh redirect nhầm khi user
   // tải lại trang /register/style trực tiếp.
   useEffect(() => {
-    if (isHydrated && !data.phone) {
+    if (isHydrated && !data.phone && !isSuccess) {
       router.replace("/register");
     }
-  }, [isHydrated, data.phone, router]);
+  }, [isHydrated, data.phone, isSuccess, router]);
 
   const maxReached = selectedIds.length >= MAX_STYLES;
 
@@ -64,20 +70,81 @@ export default function RegisterStylePage() {
     });
   }
 
-  function goToVerify() {
-    router.push(
-      `/verify-otp?flow=register&email=${encodeURIComponent(data.email || "")}&phone=${encodeURIComponent(data.phone || "")}`
-    );
+  async function submitRegistration(stylesToSave) {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    setServerError("");
+
+    try {
+      const payload = {
+        name: data.name,
+        phone: data.phone,
+        email: data.email,
+        password: data.password,
+        gender: data.gender || "unisex",
+        selectedStyles: stylesToSave,
+      };
+
+      const res = await registerUser(payload);
+      if (!res.success) {
+        setServerError(res.message || "Đăng ký không thành công. Vui lòng thử lại.");
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Đăng nhập người dùng ngay sau khi tạo tài khoản thành công
+      const preferredStyle = stylesToSave[0] || "minimal";
+      login(
+        res.data?.user || {
+          name: data.name,
+          email: data.email,
+          phoneNumber: data.phone,
+          gender: data.gender || "unisex",
+          stylePreference: preferredStyle,
+        },
+        preferredStyle,
+        res.data?.token
+      );
+
+      clearRegistrationData();
+      setIsSuccess(true);
+
+      // Chuyển hướng sang trang Smart Outfit để khách khám phá các set đồ phù hợp theo giới tính & phong cách
+      setTimeout(() => {
+        router.push("/smart-outfit");
+      }, 1200);
+    } catch (err) {
+      setServerError(err.message || "Có lỗi xảy ra khi tạo tài khoản. Vui lòng thử lại.");
+      setIsSubmitting(false);
+    }
   }
 
   function handleContinue() {
     saveSelectedStyles(selectedIds);
-    goToVerify();
+    submitRegistration(selectedIds);
   }
 
   function handleSkip() {
     saveSelectedStyles([]);
-    goToVerify();
+    submitRegistration([]);
+  }
+
+  if (isSuccess) {
+    return (
+      <AuthLayout contentMaxWidth="560px">
+        <div className={styles.successState}>
+          <span className={styles.successIcon} aria-hidden="true">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+          </span>
+          <h1 className={styles.successTitle}>Đăng ký thành công!</h1>
+          <p className={styles.successSubtitle}>
+            Chào mừng bạn đến với Routine. Đang chuyển hướng bạn đến bộ sưu tập trang phục và phong cách phù hợp...
+          </p>
+        </div>
+      </AuthLayout>
+    );
   }
 
   return (
@@ -108,11 +175,22 @@ export default function RegisterStylePage() {
         <p className={styles.maxHint}>Bạn đã chọn tối đa 3 phong cách.</p>
       )}
 
+      {serverError && (
+        <p className={styles.serverError}>
+          {serverError}
+        </p>
+      )}
+
       <div className={styles.actions}>
-        <PrimaryButton type="button" onClick={handleContinue}>
-          Tiếp tục
+        <PrimaryButton type="button" onClick={handleContinue} disabled={isSubmitting}>
+          {isSubmitting ? "Đang hoàn tất..." : "Hoàn tất đăng ký"}
         </PrimaryButton>
-        <button type="button" className={styles.skipButton} onClick={handleSkip}>
+        <button
+          type="button"
+          className={styles.skipButton}
+          onClick={handleSkip}
+          disabled={isSubmitting}
+        >
           Bỏ qua
         </button>
       </div>

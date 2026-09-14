@@ -1,7 +1,7 @@
 const http = require('http');
-const app = require('./app');
-const config = require('./src/config/vnpay');
-const { createSecureHash } = require('./src/utils/vnpayHelper');
+const app = require('../app');
+const config = require('../src/config/vnpay');
+const { createSecureHash } = require('../src/utils/vnpayHelper');
 
 const server = http.createServer(app);
 const TEST_PORT = 5012;

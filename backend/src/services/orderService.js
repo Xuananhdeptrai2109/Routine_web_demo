@@ -2,6 +2,7 @@ const prisma = require('../config/prisma');
 const cartService = require('./cartService');
 const stockReservationService = require('./stockReservationService');
 const emailService = require('./emailService');
+const couponService = require('./couponService');
 
 /**
  * Xây dựng timeline các mốc thời gian giao nhận
@@ -96,6 +97,7 @@ async function formatOrder(o) {
     shippingFee: o.shippingFee,
     shipping: o.shippingFee,
     discount: o.discount,
+    appliedCoupon: o.appliedCoupon || null,
     total: o.total,
     attributionSource: o.attributionSource || (o.user?.source || 'ORGANIC'),
     note: o.note || '',
@@ -134,10 +136,12 @@ async function createOrder(identityId, orderInput) {
     shippingMethod = 'standard',
     paymentMethod = 'cod',
     subtotal,
-    shipping = 30000,
+    shipping,
     discount = 0,
     total,
     note,
+    appliedCoupon,
+    couponCode,
   } = orderInput;
 
   let orderItems = items;
@@ -164,10 +168,30 @@ async function createOrder(identityId, orderInput) {
       ? Number(subtotal)
       : orderItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
-  const calculatedShipping = shipping !== undefined ? Number(shipping) : (calculatedSubtotal >= 500000 ? 0 : 30000);
-  const calculatedDiscount = discount !== undefined ? Number(discount) : 0;
+  let calculatedShipping = shipping !== undefined ? Number(shipping) : (calculatedSubtotal >= 500000 ? 0 : 30000);
+  let calculatedDiscount = discount !== undefined ? Number(discount) : 0;
+  let finalCoupon = (appliedCoupon || couponCode || '').trim().toUpperCase() || null;
+
+  // Xác thực mã giảm giá nếu có gửi kèm
+  if (finalCoupon) {
+    try {
+      const couponValidation = await couponService.validateCoupon(finalCoupon, calculatedSubtotal);
+      if (couponValidation && couponValidation.valid) {
+        finalCoupon = couponValidation.code;
+        calculatedDiscount = couponValidation.discountAmount;
+        if (couponValidation.type === 'freeship') {
+          calculatedShipping = 0;
+        }
+      }
+    } catch (couponErr) {
+      console.warn(`[orderService] Mã giảm giá "${finalCoupon}" không hợp lệ:`, couponErr.message);
+      finalCoupon = null;
+      calculatedDiscount = 0;
+    }
+  }
+
   const calculatedTotal =
-    total !== undefined
+    total !== undefined && !finalCoupon
       ? Number(total)
       : Math.max(0, calculatedSubtotal + calculatedShipping - calculatedDiscount);
 
@@ -234,6 +258,7 @@ async function createOrder(identityId, orderInput) {
       shippingFee: calculatedShipping,
       discount: calculatedDiscount,
       total: calculatedTotal,
+      appliedCoupon: finalCoupon,
       attributionSource: normAttribution,
       note: note || '',
       items: {
@@ -443,7 +468,7 @@ async function reorder(id, identityId) {
   }
 
   if (order.items && order.items.length > 0) {
-    cartService.addBulkItems(
+    await cartService.addBulkItems(
       identityId,
       order.items.map((i) => ({
         productId: i.productId,
@@ -457,7 +482,7 @@ async function reorder(id, identityId) {
     );
   }
 
-  return cartService.getCart(identityId);
+  return await cartService.getCart(identityId);
 }
 
 /**

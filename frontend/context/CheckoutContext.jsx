@@ -1,18 +1,8 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useState, useCallback } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { DEFAULT_SHIPPING_METHOD } from "@/lib/checkoutConstants";
-
-// Holds the in-progress checkout state (contact info, shipping
-// address, delivery method, applied voucher) as the person moves
-// from Cart → Checkout → Payment. This is intentionally separate
-// from CartContext (which only owns cart line items) and from
-// OrderContext (which only owns completed orders).
-//
-// Persisted to sessionStorage (not localStorage) so a page refresh
-// mid-checkout doesn't lose progress, but it doesn't linger forever
-// like cart/wishlist data. Payment details (card number, CVV) are
-// NEVER stored here or anywhere else.
+import { useUser } from "@/context/UserContext";
 
 const STORAGE_KEY = "routine_checkout_v1";
 
@@ -30,6 +20,26 @@ const CheckoutContext = createContext(null);
 export function CheckoutProvider({ children }) {
   const [state, setState] = useState(defaultState);
   const [hydrated, setHydrated] = useState(false);
+  const { user } = useUser();
+  const prevUserIdRef = useRef(user?.id || null);
+
+  const reset = useCallback(() => {
+    setState(defaultState);
+    try {
+      window.sessionStorage.removeItem(STORAGE_KEY);
+    } catch {
+      // ignore storage errors
+    }
+  }, []);
+
+  // Tự động làm sạch form thanh toán khi người dùng đổi tài khoản hoặc đăng xuất
+  useEffect(() => {
+    const currentUserId = user?.id || null;
+    if (prevUserIdRef.current !== currentUserId) {
+      reset();
+      prevUserIdRef.current = currentUserId;
+    }
+  }, [user?.id, reset]);
 
   useEffect(() => {
     try {
@@ -68,15 +78,6 @@ export function CheckoutProvider({ children }) {
 
   const applyVoucher = useCallback((voucherCode, discount) => {
     setState((prev) => ({ ...prev, voucherCode, discount }));
-  }, []);
-
-  const reset = useCallback(() => {
-    setState(defaultState);
-    try {
-      window.sessionStorage.removeItem(STORAGE_KEY);
-    } catch {
-      // ignore storage errors
-    }
   }, []);
 
   const value = useMemo(

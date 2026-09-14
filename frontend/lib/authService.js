@@ -202,7 +202,8 @@ export async function register(userData) {
         phoneNumber: userData.phone || userData.phoneNumber,
         email: userData.email,
         password: userData.password,
-        stylePreference: Array.isArray(userData.selectedStyles) ? userData.selectedStyles[0] : "minimal",
+        gender: userData.gender || "unisex",
+        stylePreference: Array.isArray(userData.selectedStyles) && userData.selectedStyles.length > 0 ? userData.selectedStyles[0] : "minimal",
         source,
       }),
     });

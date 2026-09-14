@@ -1,9 +1,10 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useState, useCallback } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, useCallback, useRef } from "react";
 import {
   loadCart,
   saveCart,
+  clearLocalCart,
   makeCartLineId,
   calculateSubtotal,
   fetchCartApi,
@@ -22,41 +23,48 @@ const CartContext = createContext(null);
 export function CartProvider({ children }) {
   const [items, setItems] = useState([]);
   const [hydrated, setHydrated] = useState(false);
-  const { isLoggedIn, openAuthPrompt } = useUser();
+  const { user, isLoggedIn, openAuthPrompt } = useUser();
+  const prevUserIdRef = useRef(user?.id || null);
 
-  // Khởi tạo ban đầu: Đọc localStorage trước cho nhanh, sau đó đồng bộ với MySQL Database
+  // Khởi tạo & đồng bộ giỏ hàng cô lập theo từng tài khoản
   useEffect(() => {
-    const loaded = loadCart();
-    setItems(loaded);
+    let isCurrent = true;
+    const userId = user?.id || null;
+
+    if (!isLoggedIn || !userId) {
+      // Khi chưa đăng nhập hoặc vừa đăng xuất: làm sạch giỏ hàng người dùng
+      setItems([]);
+      clearLocalCart(prevUserIdRef.current);
+      prevUserIdRef.current = null;
+      setHydrated(true);
+      return;
+    }
+
+    // Nếu đổi tài khoản khác: dọn sạch state ngay lập tức để không lưu giữ đồ của tài khoản trước
+    if (prevUserIdRef.current !== userId) {
+      setItems([]);
+      clearLocalCart(prevUserIdRef.current);
+    }
+    prevUserIdRef.current = userId;
+
+    // Nạp cache của chính tài khoản này (nếu có)
+    const userCached = loadCart(userId);
+    if (userCached && userCached.length > 0) {
+      setItems(userCached);
+    }
     setHydrated(true);
 
     async function syncWithDatabase() {
       try {
-        const guestSessionId = typeof window !== "undefined" ? window.localStorage.getItem("routine_guest_session_id") : null;
-        if (isLoggedIn && guestSessionId) {
-          // Gộp giỏ hàng khách vào user nếu có
-          await mergeCartApi(guestSessionId);
-        }
-
         const remoteCart = await fetchCartApi();
+        if (!isCurrent) return;
+
         if (remoteCart && Array.isArray(remoteCart.items)) {
-          if (remoteCart.items.length > 0) {
-            setItems(remoteCart.items);
-            saveCart(remoteCart.items);
-          } else if (loaded.length > 0) {
-            // Đưa các item từ localStorage lên MySQL Database
-            await addBulkItemsApi(
-              loaded.map((item) => ({
-                productId: item.productId,
-                size: item.size,
-                color: item.color,
-                quantity: item.quantity,
-                image: item.image,
-                name: item.name,
-                price: item.price,
-              }))
-            );
-          }
+          setItems(remoteCart.items);
+          saveCart(remoteCart.items, userId);
+        } else {
+          setItems([]);
+          saveCart([], userId);
         }
       } catch (err) {
         console.warn("Lỗi đồng bộ giỏ hàng với Database:", err.message);
@@ -64,14 +72,22 @@ export function CartProvider({ children }) {
     }
 
     syncWithDatabase();
-  }, [isLoggedIn]);
 
-  // Luôn lưu cache localStorage để UI mượt mà
+    return () => {
+      isCurrent = false;
+    };
+  }, [isLoggedIn, user?.id]);
+
+  // Luôn lưu cache localStorage riêng biệt ứng với tài khoản đang đăng nhập
   useEffect(() => {
     if (hydrated) {
-      saveCart(items);
+      if (isLoggedIn && user?.id) {
+        saveCart(items, user.id);
+      } else {
+        saveCart(items, null);
+      }
     }
-  }, [items, hydrated]);
+  }, [items, hydrated, isLoggedIn, user?.id]);
 
   const addToCart = useCallback(
     (product, { size, color, quantity = 1 } = {}) => {
@@ -182,8 +198,13 @@ export function CartProvider({ children }) {
 
   const clearCart = useCallback(() => {
     setItems([]);
+    if (user?.id) {
+      clearLocalCart(user.id);
+    } else {
+      clearLocalCart(null);
+    }
     clearCartApi().catch((e) => console.warn("Lỗi dọn sạch DB:", e.message));
-  }, []);
+  }, [user?.id]);
 
   const getCartTotal = useCallback(() => calculateSubtotal(items), [items]);
 

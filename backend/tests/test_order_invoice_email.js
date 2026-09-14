@@ -1,7 +1,7 @@
-const prisma = require('./src/config/prisma');
-const orderService = require('./src/services/orderService');
-const vnpayService = require('./src/services/vnpayService');
-const emailService = require('./src/services/emailService');
+const prisma = require('../src/config/prisma');
+const orderService = require('../src/services/orderService');
+const vnpayService = require('../src/services/vnpayService');
+const emailService = require('../src/services/emailService');
 
 async function runTests() {
   console.log('================================================================');

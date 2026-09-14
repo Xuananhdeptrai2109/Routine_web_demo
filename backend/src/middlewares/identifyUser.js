@@ -33,8 +33,9 @@ function identifyUser(req, res, next) {
       req.cookies?.routine_session_id;
 
     if (sessionId) {
-      req.identityId = `guest_${sessionId}`;
-      req.sessionId = sessionId;
+      const cleanSessionId = String(sessionId).trim().replace(/^(guest_)+/, '');
+      req.identityId = `guest_${cleanSessionId}`;
+      req.sessionId = cleanSessionId;
       req.isAuth = false;
       return next();
     }

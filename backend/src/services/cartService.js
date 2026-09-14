@@ -1,6 +1,6 @@
 const prisma = require('../config/prisma');
 const { products: fallbackProducts } = require('../data/products');
-const { couponsMap } = require('./couponService');
+const couponService = require('./couponService');
 
 // Danh sách mã ưu đãi hợp lệ mặc định
 const AVAILABLE_COUPONS = {
@@ -113,16 +113,17 @@ async function calculateCartTotals(cart) {
   let couponInfo = null;
 
   if (cart.appliedCoupon && subtotal > 0) {
-    let coupon = (couponsMap && couponsMap.get(cart.appliedCoupon)) || AVAILABLE_COUPONS[cart.appliedCoupon];
-    if (!coupon) {
-      try {
-        const dbCoupon = await prisma.coupon.findUnique({ where: { code: cart.appliedCoupon } });
-        if (dbCoupon && dbCoupon.isActive) {
-          coupon = dbCoupon;
-        }
-      } catch {
-        // ignore
+    let coupon = null;
+    try {
+      const dbCoupon = await prisma.coupon.findUnique({ where: { code: cart.appliedCoupon } });
+      if (dbCoupon && dbCoupon.isActive) {
+        coupon = dbCoupon;
       }
+    } catch {
+      // ignore
+    }
+    if (!coupon) {
+      coupon = AVAILABLE_COUPONS[cart.appliedCoupon] || null;
     }
 
     if (coupon) {
@@ -431,17 +432,17 @@ async function applyCoupon(identityId, code) {
   }
 
   const normalizedCode = code.trim().toUpperCase();
-  let coupon = (couponsMap && couponsMap.get(normalizedCode)) || AVAILABLE_COUPONS[normalizedCode];
-
-  if (!coupon) {
-    try {
-      const dbCoupon = await prisma.coupon.findUnique({ where: { code: normalizedCode } });
-      if (dbCoupon && dbCoupon.isActive) {
-        coupon = dbCoupon;
-      }
-    } catch {
-      // ignore
+  let coupon = null;
+  try {
+    const dbCoupon = await prisma.coupon.findUnique({ where: { code: normalizedCode } });
+    if (dbCoupon && dbCoupon.isActive) {
+      coupon = dbCoupon;
     }
+  } catch {
+    // ignore
+  }
+  if (!coupon) {
+    coupon = AVAILABLE_COUPONS[normalizedCode] || null;
   }
 
   if (!coupon || coupon.isActive === false) {
@@ -499,13 +500,18 @@ async function removeCoupon(identityId) {
  * Gộp giỏ hàng từ Guest Session vào User Account khi đăng nhập
  */
 async function mergeCart(guestSessionId, userIdentityId) {
-  const cleanGuestId = String(guestSessionId || '').replace(/^guest_/, '');
+  const cleanGuestId = String(guestSessionId || '').trim().replace(/^(guest_)+/, '');
   if (!cleanGuestId) {
     return getCart(userIdentityId);
   }
 
-  const guestCart = await prisma.cart.findUnique({
-    where: { guestSessionId: cleanGuestId },
+  const guestCart = await prisma.cart.findFirst({
+    where: {
+      OR: [
+        { guestSessionId: cleanGuestId },
+        { guestSessionId: `guest_${cleanGuestId}` },
+      ],
+    },
     include: { items: true },
   });
 

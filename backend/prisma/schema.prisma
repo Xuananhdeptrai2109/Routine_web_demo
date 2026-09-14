@@ -41,6 +41,7 @@ model User {
   passwordHash    String      @map("password_hash")
   role            Role        @default(CUSTOMER)
   avatar          String?     @db.VarChar(500)
+  gender          String?     @default("unisex")
   stylePreference String?     @default("minimal") @map("style_preference")
   source          String?     @default("ORGANIC")
   createdAt       DateTime    @default(now()) @map("created_at")

@@ -41,7 +41,7 @@ function sanitizeUser(user) {
 /**
  * Dịch vụ Đăng ký tài khoản
  */
-async function registerUser({ fullName, phoneNumber, email, password, stylePreference = 'minimal', source = 'ORGANIC' }) {
+async function registerUser({ fullName, phoneNumber, email, password, gender = 'unisex', stylePreference = 'minimal', source = 'ORGANIC' }) {
   let existingPhone = null;
   let existingEmail = null;
 
@@ -72,6 +72,7 @@ async function registerUser({ fullName, phoneNumber, email, password, stylePrefe
   const passwordHash = await bcrypt.hash(password, salt);
 
   const normSource = String(source || 'ORGANIC').toUpperCase();
+  const normGender = String(gender || 'unisex').toLowerCase().trim();
 
   let newUser = null;
   try {
@@ -81,6 +82,7 @@ async function registerUser({ fullName, phoneNumber, email, password, stylePrefe
         phoneNumber,
         email,
         passwordHash,
+        gender: normGender,
         stylePreference,
         source: normSource,
       },
@@ -95,6 +97,7 @@ async function registerUser({ fullName, phoneNumber, email, password, stylePrefe
       email,
       passwordHash,
       role: 'CUSTOMER',
+      gender: normGender,
       stylePreference,
       source: normSource,
       createdAt: new Date().toISOString(),

@@ -1,17 +1,17 @@
 const http = require('http');
-const app = require('./app');
+const app = require('../app');
 
 const server = http.createServer(app);
 
-server.listen(5001, async () => {
-  console.log('Test server running on port 5001');
+server.listen(5015, async () => {
+  console.log('Test server running on port 5015');
 
   async function request(path, options = {}) {
     return new Promise((resolve, reject) => {
       const req = http.request(
         {
           hostname: '127.0.0.1',
-          port: 5001,
+          port: 5015,
           path,
           method: options.method || 'GET',
           headers: {

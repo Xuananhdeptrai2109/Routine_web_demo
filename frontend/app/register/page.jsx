@@ -23,6 +23,7 @@ import styles from "./page.module.css";
 
 const initialForm = {
   name: "",
+  gender: "men",
   phone: "",
   email: "",
   password: "",
@@ -103,6 +104,7 @@ export default function RegisterPage() {
 
     saveAccountInfo({
       name: form.name.trim(),
+      gender: form.gender || "men",
       phone: form.phone,
       email: form.email.trim(),
       password: form.password,
@@ -132,6 +134,35 @@ export default function RegisterPage() {
           error={nameError}
           touched={touched.name}
         />
+
+        <div className={styles.genderGroup}>
+          <label className={styles.genderLabel}>
+            Giới tính <span className={styles.genderSubLabel}>(để Routine gợi ý outfit chuẩn dáng cho bạn)</span>
+          </label>
+          <div className={styles.genderOptions}>
+            <button
+              type="button"
+              className={`${styles.genderBtn} ${form.gender === "men" ? styles.genderBtnActive : ""}`}
+              onClick={() => updateField("gender", "men")}
+            >
+              <span className={styles.genderIcon}>♂</span> Nam
+            </button>
+            <button
+              type="button"
+              className={`${styles.genderBtn} ${form.gender === "women" ? styles.genderBtnActive : ""}`}
+              onClick={() => updateField("gender", "women")}
+            >
+              <span className={styles.genderIcon}>♀</span> Nữ
+            </button>
+            <button
+              type="button"
+              className={`${styles.genderBtn} ${form.gender === "unisex" ? styles.genderBtnActive : ""}`}
+              onClick={() => updateField("gender", "unisex")}
+            >
+              <span className={styles.genderIcon}>✦</span> Khác
+            </button>
+          </div>
+        </div>
 
         <PhoneField
           value={form.phone}

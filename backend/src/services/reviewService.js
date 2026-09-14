@@ -1,6 +1,8 @@
 const prisma = require('../config/prisma');
 const { processImageArray } = require('../utils/fileStorage');
 
+const reviewStatusStore = new Map();
+
 function formatReview(r) {
   if (!r) return null;
   const images = Array.isArray(r.images)
@@ -32,7 +34,7 @@ function formatReview(r) {
     rating: r.rating,
     comment: r.comment || '',
     images,
-    status: 'APPROVED',
+    status: reviewStatusStore.get(r.id) || 'APPROVED',
     createdAt: r.createdAt,
     product: r.product
       ? {
@@ -259,10 +261,67 @@ async function getAllReviewsForAdmin({ page = 1, limit = 10, rating, status = 'A
   };
 }
 
+/**
+ * Cập nhật trạng thái duyệt đánh giá (Admin)
+ */
+async function updateReviewStatus(id, status) {
+  const normalized = (status || '').toUpperCase();
+  const valid = ['APPROVED', 'HIDDEN', 'PENDING'];
+  if (!valid.includes(normalized)) {
+    const error = new Error('Trạng thái đánh giá không hợp lệ. Chỉ chấp nhận APPROVED, HIDDEN, hoặc PENDING');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const review = await prisma.review.findUnique({ where: { id } });
+  if (!review) {
+    const error = new Error(`Không tìm thấy đánh giá với mã "${id}"`);
+    error.statusCode = 404;
+    throw error;
+  }
+
+  reviewStatusStore.set(id, normalized);
+
+  return {
+    id,
+    status: normalized,
+    message: `Đã cập nhật trạng thái đánh giá sang "${normalized}"`,
+  };
+}
+
+/**
+ * Lấy số liệu thống kê đánh giá hệ thống (Admin)
+ */
+async function getReviewStatsForAdmin() {
+  const reviews = await prisma.review.findMany({ select: { id: true, rating: true } });
+  const totalReviews = reviews.length;
+  let approvedCount = 0;
+  let hiddenCount = 0;
+  let totalRating = 0;
+
+  for (const r of reviews) {
+    const st = reviewStatusStore.get(r.id) || 'APPROVED';
+    if (st === 'HIDDEN') hiddenCount++;
+    else approvedCount++;
+    totalRating += r.rating;
+  }
+
+  const averageRating = totalReviews > 0 ? parseFloat((totalRating / totalReviews).toFixed(1)) : 5.0;
+
+  return {
+    totalReviews,
+    approvedCount,
+    hiddenCount,
+    averageRating,
+  };
+}
+
 module.exports = {
   getProductReviews,
   createReview,
   deleteReview,
   getAllReviewsForAdmin,
   recalculateProductRating,
+  updateReviewStatus,
+  getReviewStatsForAdmin,
 };

@@ -14,7 +14,7 @@ const INITIAL_QUICK_CHIPS = [
 ];
 
 export default function AIStylistChat({ initialPrompt = "", currentProductId = null, embedded = false }) {
-  const { isLoggedIn, openAuthPrompt } = useUser();
+  const { user, isLoggedIn, openAuthPrompt } = useUser();
   const [messages, setMessages] = useState([
     {
       id: "msg-welcome",
@@ -77,6 +77,7 @@ export default function AIStylistChat({ initialPrompt = "", currentProductId = n
         message: text.trim(),
         history: newHistory,
         currentProductId,
+        userPreferences: user ? { gender: user.gender, style: user.stylePreference } : null,
       });
 
       setMessages([

@@ -4,8 +4,8 @@
  */
 
 const assert = require('assert');
-const { normalizeFashionQuery } = require('./src/utils/fashionThesaurus');
-const { chatWithStylist } = require('./src/services/aiService');
+const { normalizeFashionQuery } = require('../src/utils/fashionThesaurus');
+const { chatWithStylist } = require('../src/services/aiService');
 
 async function run() {
   console.log('=== KIỂM THỬ CHUẨN HÓA NGÔN NGỮ & AI STYLIST CHAT ===\n');

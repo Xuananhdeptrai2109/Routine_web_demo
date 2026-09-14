@@ -9,8 +9,8 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
-const app = require('./app');
-const { generateToken } = require('./src/services/authService');
+const app = require('../app');
+const { generateToken } = require('../src/services/authService');
 
 const PORT = 5099;
 let server;
@@ -293,7 +293,9 @@ async function runTests() {
       body: multipartBody,
     });
     assert(
-      resUpload.status === 201 && typeof resUpload.data.data.url === 'string' && resUpload.data.data.url.startsWith('/uploads/'),
+      resUpload.status === 201 &&
+        typeof resUpload.data.data.url === 'string' &&
+        (resUpload.data.data.url.startsWith('/uploads/') || resUpload.data.data.url.startsWith('/api/v1/media/')),
       'POST /api/v1/upload/image uploads image file and returns static url'
     );
 

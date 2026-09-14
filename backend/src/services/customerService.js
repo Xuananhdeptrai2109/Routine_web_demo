@@ -237,15 +237,6 @@ async function updateCustomerStatus(id, status) {
 
   userStatusStore.set(id, nextStatus);
 
-  try {
-    await prisma.user.update({
-      where: { id },
-      data: { status: nextStatus },
-    });
-  } catch (err) {
-    // In-memory fallback updated
-  }
-
   return {
     id,
     status: nextStatus,

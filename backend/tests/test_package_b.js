@@ -1,19 +1,19 @@
 const http = require('http');
 const jwt = require('jsonwebtoken');
-const app = require('./app');
+const app = require('../app');
 
 const server = http.createServer(app);
 const TEST_PORT = 5008;
 const JWT_SECRET = process.env.JWT_SECRET || 'routine_web_jwt_secret_key_change_me';
 
 const customerToken = jwt.sign(
-  { userId: 'user_pkg_b_01', fullName: 'Phạm Minh Tuấn', email: 'tuan@test.com', role: 'CUSTOMER' },
+  { userId: 'usr-customer-001', fullName: 'Nguyễn Văn A', email: 'nguyenvana@gmail.com', role: 'CUSTOMER' },
   JWT_SECRET,
   { expiresIn: '1h' }
 );
 
 const adminToken = jwt.sign(
-  { userId: 'admin_pkg_b_01', fullName: 'Admin Routine', email: 'admin@routine.vn', role: 'ADMIN' },
+  { userId: 'c0d4fbad-b038-11f1-9fbc-005056c00001', fullName: 'Admin Routine', email: 'admin_new@routine.vn', role: 'ADMIN' },
   JWT_SECRET,
   { expiresIn: '1h' }
 );
@@ -130,12 +130,13 @@ server.listen(TEST_PORT, async () => {
       'POST /api/v1/coupons/validate calculates correct discount'
     );
 
-    // 6. Admin tạo mã giảm giá mới FLASH50
+    // 6. Admin tạo mã giảm giá mới
+    const testCouponCode = 'FLASH50_PKG_B';
     const createCpn = await request('/api/v1/coupons', {
       method: 'POST',
       headers: { Authorization: `Bearer ${adminToken}` },
       body: {
-        code: 'FLASH50',
+        code: testCouponCode,
         type: 'fixed',
         value: 50000,
         minOrderValue: 200000,
@@ -143,11 +144,11 @@ server.listen(TEST_PORT, async () => {
       },
     });
     assert(
-      createCpn.status === 201 && createCpn.body.data.code === 'FLASH50',
+      createCpn.status === 201 && createCpn.body.data.code === testCouponCode,
       'POST /api/v1/coupons creates new coupon with ADMIN token'
     );
 
-    // 7. Thêm hàng vào giỏ và áp dụng mã FLASH50 vừa tạo
+    // 7. Thêm hàng vào giỏ và áp dụng mã vừa tạo
     const addCart = await request('/api/v1/cart/items', {
       method: 'POST',
       headers: { 'x-session-id': 'session-pkg-b' },
@@ -158,17 +159,17 @@ server.listen(TEST_PORT, async () => {
     const applyCpn = await request('/api/v1/cart/apply-coupon', {
       method: 'POST',
       headers: { 'x-session-id': 'session-pkg-b' },
-      body: { code: 'FLASH50' },
+      body: { code: testCouponCode },
     });
     assert(
       applyCpn.status === 200 &&
-        applyCpn.body.data.appliedCoupon.code === 'FLASH50' &&
+        applyCpn.body.data.appliedCoupon.code === testCouponCode &&
         applyCpn.body.data.discount === 50000,
       'POST /api/v1/cart/apply-coupon applies newly created Admin coupon dynamically in cart'
     );
 
     // 8. Admin cập nhật mã giảm giá
-    const updateCpn = await request('/api/v1/coupons/FLASH50', {
+    const updateCpn = await request(`/api/v1/coupons/${testCouponCode}`, {
       method: 'PUT',
       headers: { Authorization: `Bearer ${adminToken}` },
       body: {
@@ -182,7 +183,7 @@ server.listen(TEST_PORT, async () => {
     );
 
     // 9. Admin xóa mã giảm giá
-    const delCpn = await request('/api/v1/coupons/FLASH50', {
+    const delCpn = await request(`/api/v1/coupons/${testCouponCode}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${adminToken}` },
     });

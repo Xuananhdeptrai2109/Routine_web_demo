@@ -7,10 +7,10 @@
  */
 
 const assert = require('assert');
-const cartService = require('./src/services/cartService');
-const orderService = require('./src/services/orderService');
-const stockReservationService = require('./src/services/stockReservationService');
-const prisma = require('./src/config/prisma');
+const cartService = require('../src/services/cartService');
+const orderService = require('../src/services/orderService');
+const stockReservationService = require('../src/services/stockReservationService');
+const prisma = require('../src/config/prisma');
 
 async function runTests() {
   console.log('=== BẮT ĐẦU KIỂM THỬ CÁC HẠN CHẾ KỸ THUẬT ĐÃ KHẮC PHỤC ===\n');
@@ -20,7 +20,7 @@ async function runTests() {
   // TEST 1: identifyUser middleware sinh guest session độc lập
   try {
     console.log('[TEST 1] Kiểm tra identifyUser middleware sinh guest session duy nhất:');
-    const identifyUser = require('./src/middlewares/identifyUser');
+    const identifyUser = require('../src/middlewares/identifyUser');
     const mockReq1 = { headers: {}, ip: '127.0.0.1' };
     const mockRes1 = {
       headers: {},
@@ -131,9 +131,9 @@ async function runTests() {
   // TEST 4: Kiểm tra Helmet và Rate Limiting middleware
   try {
     console.log('[TEST 4] Kiểm tra Helmet & Rate Limiter trong app.js:');
-    const app = require('./app');
+    const app = require('../app');
     assert.ok(app, 'App phải export Express instance');
-    const { generalLimiter, authLimiter, aiLimiter } = require('./src/middlewares/rateLimiter');
+    const { generalLimiter, authLimiter, aiLimiter } = require('../src/middlewares/rateLimiter');
     assert.ok(generalLimiter, 'generalLimiter phải tồn tại');
     assert.ok(authLimiter, 'authLimiter phải tồn tại');
     assert.ok(aiLimiter, 'aiLimiter phải tồn tại');

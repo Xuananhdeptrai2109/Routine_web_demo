@@ -690,6 +690,34 @@ async function chatWithStylist({ message, history = [], currentProductId = null,
   // 1. Phân tích intent và chuẩn hóa từ vựng tiếng Việt với ngữ cảnh đa lượt
   const intent = await extractFashionIntent(message, history);
 
+  // Áp dụng sở thích người dùng (userPreferences) nếu câu chat chưa chỉ định rõ
+  if (userPreferences) {
+    if (userPreferences.gender) {
+      const g = String(userPreferences.gender).toLowerCase().trim();
+      const mLower = (message || '').toLowerCase();
+      const hasExplicitGenderInMessage =
+        mLower.includes('nam') ||
+        mLower.includes('nữ') ||
+        mLower.includes('con gái') ||
+        mLower.includes('phái đẹp') ||
+        mLower.includes('men') ||
+        mLower.includes('women');
+
+      if (!hasExplicitGenderInMessage) {
+        if (g === 'women' || g === 'nữ' || g === 'nu') {
+          intent.gender = 'women';
+        } else if (g === 'men' || g === 'nam') {
+          intent.gender = 'men';
+        } else if (g === 'unisex') {
+          intent.gender = 'unisex';
+        }
+      }
+    }
+    if (userPreferences.style && !intent.style) {
+      intent.style = userPreferences.style;
+    }
+  }
+
   // 2. Nếu khách chỉ chào hỏi hoặc hỏi chuyện chung (không yêu cầu tìm đồ cụ thể)
   if (!intent.isAskingForOutfit) {
     const greetingTemplates = [

@@ -3,7 +3,6 @@
 > **Nền tảng thương mại điện tử thời trang cao cấp** kết hợp công nghệ **Smart Outfit**, **Trợ lý tư vấn tạo mẫu ảo AI Stylist thế hệ mới** (tích hợp Google Gemini AI & Bộ chuẩn hóa ngữ nghĩa thời trang tiếng Việt), **Hệ sinh thái phân tích tiếp thị đa nền tảng (Omni-channel Analytics)**, cổng thanh toán trực tuyến **VNPay Sandbox** và hệ thống quản trị **Admin Portal** hoàn chỉnh.
 
 ---
-
 ## 📌 Mục lục
 
 1. [Giới thiệu tổng quan & Giá trị dự án](#1-giới-thiệu-tổng-quan--giá-trị-dự-án)
@@ -157,9 +156,8 @@ Hệ thống đã có sẵn các tài khoản mẫu trong cơ sở dữ liệu `
 
 | Loại tài khoản | Email đăng nhập | Mật khẩu mặc định | Quyền hạn (Role) | Trang truy cập |
 | :--- | :--- | :---: | :---: | :--- |
-| **Quản trị viên (Admin)** | `admin@routine.vn` | `Admin@123` | `ADMIN` | `http://localhost:3000/admin` |
+| **Quản trị viên (Admin)** | `admin_new@routine.vn` | `Admin@123456` | `ADMIN` | `http://localhost:3000/admin` |
 | **Khách hàng 1 (Customer)** | `nguyenvana@gmail.com` | `123456` | `CUSTOMER` | `http://localhost:3000/login` |
-| **Khách hàng 2 (Customer)** | `bichngoc.tran@gmail.com`| `123456` | `CUSTOMER` | `http://localhost:3000/login` |
 
 ---
 

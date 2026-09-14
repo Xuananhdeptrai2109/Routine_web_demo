@@ -3,12 +3,10 @@ import styles from "./StepIndicator.module.css";
 const STEPS = [
   { id: 1, label: "Tài khoản" },
   { id: 2, label: "Phong cách" },
-  { id: 3, label: "Xác thực" },
 ];
 
 /**
- * `currentStep`: 1 | 2 | 3 — dùng ở /register, /register/style và trạng
- * thái Register của /verify-otp.
+ * `currentStep`: 1 | 2 — dùng ở /register và /register/style.
  */
 export default function StepIndicator({ currentStep }) {
   return (

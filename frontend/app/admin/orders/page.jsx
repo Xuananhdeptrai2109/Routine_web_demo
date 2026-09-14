@@ -690,7 +690,7 @@ export default function AdminOrdersPage() {
                   </div>
                   {selectedOrder.discount > 0 && (
                     <div className={styles.detailRow}>
-                      <span>Giảm giá ({selectedOrder.appliedCoupon}):</span>
+                      <span>Giảm giá {selectedOrder.appliedCoupon ? `(${selectedOrder.appliedCoupon})` : ""}:</span>
                       <span className={styles.detailRowValue} style={{ color: "#ef4444" }}>
                         -{formatPrice(selectedOrder.discount)}
                       </span>

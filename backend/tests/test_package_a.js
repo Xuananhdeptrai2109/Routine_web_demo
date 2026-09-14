@@ -1,13 +1,16 @@
 const http = require('http');
 const jwt = require('jsonwebtoken');
-const app = require('./app');
+const bcrypt = require('bcryptjs');
+const app = require('../app');
+const prisma = require('../src/config/prisma');
 
 const server = http.createServer(app);
 const TEST_PORT = 5007;
 const JWT_SECRET = process.env.JWT_SECRET || 'routine_web_jwt_secret_key_change_me';
+const testUserId = 'usr-pkg-a-test';
 
 const testUserToken = jwt.sign(
-  { userId: 'user_pkg_a_01', email: 'test_pkga@example.com', phoneNumber: '0933333333', role: 'CUSTOMER' },
+  { userId: testUserId, email: 'pkg_a_test@routine.vn', phoneNumber: '0977665544', role: 'CUSTOMER' },
   JWT_SECRET,
   { expiresIn: '1h' }
 );
@@ -62,6 +65,20 @@ server.listen(TEST_PORT, async () => {
   }
 
   try {
+    await prisma.address.deleteMany({ where: { userId: testUserId } });
+    const hash = await bcrypt.hash('any_or_bypass', 10);
+    await prisma.user.upsert({
+      where: { id: testUserId },
+      update: { passwordHash: hash },
+      create: {
+        id: testUserId,
+        fullName: 'Test Package A',
+        email: 'pkg_a_test@routine.vn',
+        phoneNumber: '0977665544',
+        passwordHash: hash,
+        role: 'CUSTOMER',
+      },
+    });
     // 1. Thêm địa chỉ mới
     const addAddr = await request('/api/v1/users/addresses', {
       method: 'POST',

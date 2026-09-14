@@ -1,6 +1,6 @@
 const http = require('http');
 const jwt = require('jsonwebtoken');
-const app = require('./app');
+const app = require('../app');
 
 const server = http.createServer(app);
 const TEST_PORT = 5006;

@@ -70,6 +70,7 @@ export default function PaymentPage() {
       subtotal,
       shipping: shippingFee,
       discount: checkout.discount,
+      appliedCoupon: checkout.voucherCode || null,
       total,
       customerEmail,
     };
@@ -191,6 +192,7 @@ export default function PaymentPage() {
             subtotal={subtotal}
             shippingMethod={checkout.shippingMethod}
             discount={checkout.discount}
+            voucherCode={checkout.voucherCode}
             onPlaceOrder={handlePlaceOrder}
             isProcessing={isProcessing}
             error={error}

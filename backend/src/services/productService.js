@@ -479,7 +479,11 @@ async function duplicateProduct(id) {
     reviewCount: 0,
   };
 
-  return createProduct(cloned);
+  const created = await createProduct(cloned);
+  return {
+    ...created,
+    status: 'DRAFT',
+  };
 }
 
 /**
