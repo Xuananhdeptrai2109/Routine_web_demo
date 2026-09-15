@@ -35,6 +35,7 @@ export async function createOrder(orderInput) {
     const data = await fetchApi('/orders', {
       method: 'POST',
       body: JSON.stringify(payload),
+      timeout: 45000,
     });
     return data;
   } catch (err) {

@@ -45,7 +45,14 @@ export async function fetchApi(endpoint, options = {}) {
   }
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), options.timeout || 8000);
+  const timeoutMs = options.timeout || 30000;
+  const timeoutId = setTimeout(() => {
+    try {
+      controller.abort(new Error(`Yêu cầu đến ${endpoint} quá thời gian chờ (${timeoutMs / 1000}s). Vui lòng thử lại.`));
+    } catch {
+      controller.abort();
+    }
+  }, timeoutMs);
 
   try {
     const res = await fetch(url, {
@@ -68,6 +75,9 @@ export async function fetchApi(endpoint, options = {}) {
     return json?.data !== undefined ? json.data : json;
   } catch (err) {
     clearTimeout(timeoutId);
+    if (err.name === 'AbortError' || err.message?.includes('aborted')) {
+      throw new Error(`Kết nối máy chủ bị quá hạn (${timeoutMs / 1000}s). Vui lòng kiểm tra lại đường truyền và thử lại.`);
+    }
     throw err;
   }
 }

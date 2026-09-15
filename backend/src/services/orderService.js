@@ -195,16 +195,29 @@ async function createOrder(identityId, orderInput) {
       ? Number(total)
       : Math.max(0, calculatedSubtotal + calculatedShipping - calculatedDiscount);
 
-  // Sinh ID dạng ORD-YYYY-XXXX
+  // Sinh ID dạng ORD-YYYY-XXXX tối ưu không kéo toàn bộ bảng đơn hàng
   const year = new Date().getFullYear();
-  const allOrders = await prisma.order.findMany({ select: { id: true } });
-  const numbers = allOrders
-    .map((o) => {
-      const match = o.id.match(/ORD-(\d{4})-(\d+)/);
-      return match && Number(match[1]) === year ? Number(match[2]) : 0;
-    })
-    .filter(Boolean);
-  const nextNum = (numbers.length > 0 ? Math.max(...numbers) : 0) + 1;
+  let nextNum = 1;
+  try {
+    const latestOrder = await prisma.order.findFirst({
+      where: { id: { startsWith: `ORD-${year}-` } },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true },
+    });
+    if (latestOrder && latestOrder.id) {
+      const match = latestOrder.id.match(/ORD-\d{4}-(\d+)/);
+      if (match) {
+        nextNum = Number(match[1]) + 1;
+      }
+    } else {
+      const count = await prisma.order.count({
+        where: { id: { startsWith: `ORD-${year}-` } },
+      });
+      nextNum = count + 1;
+    }
+  } catch (err) {
+    nextNum = Date.now() % 10000;
+  }
   const newOrderId = `ORD-${year}-${String(nextNum).padStart(4, '0')}`;
 
   const payMethodMap = {
@@ -242,6 +255,43 @@ async function createOrder(identityId, orderInput) {
       : providedSource || 'ORGANIC';
   const normAttribution = String(resolvedSource).toUpperCase();
 
+  // Tối ưu ảnh sản phẩm: Tìm nạp hàng loạt ảnh thiếu nếu có (tránh N+1 query)
+  const missingImgProdIds = orderItems
+    .filter((it) => (!it.image || it.image.trim() === '') && it.productId)
+    .map((it) => it.productId);
+
+  const fallbackImgMap = new Map();
+  if (missingImgProdIds.length > 0) {
+    try {
+      const prods = await prisma.product.findMany({
+        where: { id: { in: [...new Set(missingImgProdIds)] } },
+        select: { id: true, images: true },
+      });
+      prods.forEach((p) => {
+        try {
+          const pImgs = typeof p.images === 'string' ? JSON.parse(p.images) : p.images;
+          if (Array.isArray(pImgs) && pImgs.length > 0 && pImgs[0]) {
+            fallbackImgMap.set(p.id, pImgs[0]);
+          }
+        } catch (e) {}
+      });
+    } catch (e) {}
+  }
+
+  const itemsToCreate = orderItems.map((item) => {
+    let itemImg = item.image && item.image.trim() !== '' ? item.image : fallbackImgMap.get(item.productId);
+    return {
+      productId: item.productId,
+      name: item.name || 'Sản phẩm',
+      image: itemImg && itemImg.trim() !== '' ? itemImg : '/images/placeholder.svg',
+      size: item.size || 'M',
+      color: item.color || 'Đen',
+      price: Number(item.price) || 0,
+      quantity: Number(item.quantity) || 1,
+      subtotal: (Number(item.price) || 0) * (Number(item.quantity) || 1),
+    };
+  });
+
   const created = await prisma.order.create({
     data: {
       id: newOrderId,
@@ -262,33 +312,7 @@ async function createOrder(identityId, orderInput) {
       attributionSource: normAttribution,
       note: note || '',
       items: {
-        create: await Promise.all(
-          orderItems.map(async (item) => {
-            let itemImg = item.image || '';
-            if ((!itemImg || itemImg.trim() === '') && item.productId) {
-              try {
-                const prod = await prisma.product.findUnique({
-                  where: { id: item.productId },
-                  select: { images: true },
-                });
-                if (prod && prod.images) {
-                  const pImgs = typeof prod.images === 'string' ? JSON.parse(prod.images) : prod.images;
-                  if (Array.isArray(pImgs) && pImgs.length > 0) itemImg = pImgs[0];
-                }
-              } catch (e) {}
-            }
-            return {
-              productId: item.productId,
-              name: item.name || 'Sản phẩm',
-              image: itemImg && itemImg.trim() !== '' ? itemImg : '/images/placeholder.svg',
-              size: item.size || 'M',
-              color: item.color || 'Đen',
-              price: Number(item.price) || 0,
-              quantity: Number(item.quantity) || 1,
-              subtotal: (Number(item.price) || 0) * (Number(item.quantity) || 1),
-            };
-          })
-        ),
+        create: itemsToCreate,
       },
     },
     include: { items: true },
