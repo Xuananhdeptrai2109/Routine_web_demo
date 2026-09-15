@@ -17,6 +17,7 @@ import {
 } from "@/lib/cartService";
 import { useUser } from "@/context/UserContext";
 import { fetchProductById } from "@/lib/productService";
+import { isProductOutOfStock } from "@/data/products";
 
 const CartContext = createContext(null);
 
@@ -97,6 +98,11 @@ export function CartProvider({ children }) {
           title: "Đăng nhập để thêm vào giỏ hàng",
           message: "Vui lòng đăng nhập hoặc tạo tài khoản Routine để thêm sản phẩm vào giỏ hàng và lưu lịch sử mua sắm của bạn.",
         });
+        return false;
+      }
+
+      // Không cho phép thêm vào giỏ nếu sản phẩm hết hàng
+      if (isProductOutOfStock(product)) {
         return false;
       }
 

@@ -8,6 +8,7 @@ import { StarIcon, ChevronDownIcon } from "@/components/common/Icons";
 import { formatPrice } from "@/lib/format";
 import { getColorById } from "@/data/colors";
 import { getSizeById } from "@/data/sizes";
+import { isProductOutOfStock as checkOutOfStock } from "@/data/products";
 
 function AccordionRow({ title, content }) {
   const [open, setOpen] = useState(false);
@@ -106,7 +107,8 @@ function resolveSize(s) {
   return found ? found.name : String(s).replace(/^size-/, "").toUpperCase();
 }
 
-export default function ProductInfo({ product }) {
+export default function ProductInfo({ product, isOutOfStock: propOutOfStock }) {
+  const isOutOfStock = propOutOfStock ?? checkOutOfStock(product);
   const [selectedColor, setSelectedColor] = useState(product.colors?.[0] || "");
   const [selectedSize, setSelectedSize] = useState(null);
   const [quantity, setQuantity] = useState(1);
@@ -123,6 +125,10 @@ export default function ProductInfo({ product }) {
   }, [product.colors]);
 
   function handleAddToCart() {
+    if (isOutOfStock) {
+      showToast("Sản phẩm hiện đã hết hàng.");
+      return;
+    }
     if (product.sizes?.length > 0 && !selectedSize) {
       setSizeError(true);
       return;
@@ -155,10 +161,43 @@ export default function ProductInfo({ product }) {
         </div>
       )}
 
-      <div className="price" style={{ fontSize: 20, marginBottom: 24 }}>
+      <div className="price" style={{ fontSize: 20, marginBottom: isOutOfStock ? 16 : 24, display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
         <span className="price-current">{formatPrice(product.price)}</span>
         {product.originalPrice && <span className="price-original">{formatPrice(product.originalPrice)}</span>}
+        {isOutOfStock && (
+          <span style={{ fontSize: 13, color: "#dc2626", fontWeight: 600, background: "rgba(220, 38, 38, 0.08)", padding: "2px 8px", borderRadius: 4 }}>
+            Hết hàng
+          </span>
+        )}
       </div>
+
+      {isOutOfStock && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "flex-start",
+            gap: 12,
+            padding: "14px 18px",
+            background: "rgba(220, 38, 38, 0.05)",
+            border: "1px solid rgba(220, 38, 38, 0.2)",
+            borderRadius: "var(--radius-sm, 4px)",
+            marginBottom: 24,
+            color: "#b91c1c"
+          }}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 2 }}>
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          </svg>
+          <div style={{ fontSize: 13, lineHeight: 1.5 }}>
+            <strong style={{ display: "block", fontSize: 14, marginBottom: 2 }}>TẠM HẾT HÀNG</strong>
+            <span style={{ color: "var(--color-text-secondary, #666)" }}>
+              Sản phẩm hiện đang tạm hết hàng. Quý khách vui lòng tham khảo các mẫu thời trang khác hoặc quay lại sau.
+            </span>
+          </div>
+        </div>
+      )}
 
       {product.colors?.length > 0 && (
         <div className="field" style={{ marginBottom: 20 }}>
@@ -216,6 +255,7 @@ export default function ProductInfo({ product }) {
                   type="button"
                   className={`chip ${isSelected ? "is-active" : ""}`}
                   onClick={() => {
+                    if (isOutOfStock) return;
                     setSelectedSize(size);
                     setSizeError(false);
                   }}
@@ -224,7 +264,9 @@ export default function ProductInfo({ product }) {
                     minWidth: 44,
                     height: 38,
                     padding: "0 14px",
-                    fontWeight: isSelected ? 600 : 400
+                    fontWeight: isSelected ? 600 : 400,
+                    opacity: isOutOfStock ? 0.6 : 1,
+                    cursor: isOutOfStock ? "not-allowed" : "pointer"
                   }}
                 >
                   {resolveSize(size)}
@@ -247,7 +289,9 @@ export default function ProductInfo({ product }) {
               display: "inline-flex",
               alignItems: "center",
               border: "1px solid var(--color-border)",
-              borderRadius: "var(--radius-sm)"
+              borderRadius: "var(--radius-sm)",
+              opacity: isOutOfStock ? 0.5 : 1,
+              pointerEvents: isOutOfStock ? "none" : "auto"
             }}
           >
             <button
@@ -275,10 +319,22 @@ export default function ProductInfo({ product }) {
         <button
           type="button"
           className="btn btn-primary"
-          style={{ flex: 1, height: 48, fontSize: 15 }}
+          disabled={isOutOfStock}
+          style={{
+            flex: 1,
+            height: 48,
+            fontSize: 15,
+            fontWeight: 600,
+            letterSpacing: "0.04em",
+            background: isOutOfStock ? "var(--color-bg-secondary, #ebebeb)" : undefined,
+            color: isOutOfStock ? "var(--color-text-secondary, #888)" : undefined,
+            borderColor: isOutOfStock ? "var(--color-border, #d4d4d4)" : undefined,
+            cursor: isOutOfStock ? "not-allowed" : "pointer",
+            opacity: isOutOfStock ? 0.85 : 1
+          }}
           onClick={handleAddToCart}
         >
-          Add to Bag
+          {isOutOfStock ? "TẠM HẾT HÀNG" : "Add to Bag"}
         </button>
         <div style={{ display: "flex", alignItems: "center" }}>
           <WishlistButton productId={product.id} size="md" />

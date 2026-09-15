@@ -8,6 +8,7 @@ import ProductGrid from "@/components/product/ProductGrid";
 import ProductReviews from "@/components/product/ProductReviews";
 import { fetchProductById, fetchRelatedProducts } from "@/lib/productService";
 import { recordAttributionFromUrl, trackEvent } from "@/lib/attribution";
+import { isProductOutOfStock } from "@/data/products";
 
 export default function ProductDetailClient({ initialProduct, initialRelated = [], productId }) {
   const [product, setProduct] = useState(initialProduct);
@@ -89,10 +90,12 @@ export default function ProductDetailClient({ initialProduct, initialRelated = [
           key={`gallery-${product.id}-${(product.images || []).join("-")}`}
           images={product.images}
           productName={product.name}
+          isOutOfStock={isProductOutOfStock(product)}
         />
         <ProductInfo
           key={`info-${product.id}-${product.updatedAt || ""}-${(product.colors || []).join("-")}-${(product.sizes || []).join("-")}`}
           product={product}
+          isOutOfStock={isProductOutOfStock(product)}
         />
       </div>
 

@@ -8,6 +8,7 @@ import { useCart } from "@/context/CartContext";
 import { useToast } from "@/components/common/Toast";
 import { formatPrice } from "@/lib/format";
 import { getColorById } from "@/data/colors";
+import { isProductOutOfStock } from "@/data/products";
 import styles from "./ProductCard.module.css";
 
 function resolveColorHex(name = "") {
@@ -50,10 +51,15 @@ function resolveColorHex(name = "") {
 export default function ProductCard({ product }) {
   const { addToCart } = useCart();
   const { showToast } = useToast();
+  const isOutOfStock = isProductOutOfStock(product);
 
   function handleQuickAdd(e) {
     e.preventDefault();
     e.stopPropagation();
+    if (isOutOfStock) {
+      showToast("Sản phẩm hiện đã hết hàng.");
+      return;
+    }
     addToCart(product);
     showToast("Đã thêm sản phẩm vào giỏ hàng.");
   }
@@ -63,7 +69,7 @@ export default function ProductCard({ product }) {
 
   return (
     <Link href={`/product/${product.id}`} className={styles.card}>
-      <div className={styles.imageWrap}>
+      <div className={`${styles.imageWrap} ${isOutOfStock ? styles.outOfStockWrap : ""}`}>
         {firstImg ? (
           <img
             src={firstImg}
@@ -91,23 +97,46 @@ export default function ProductCard({ product }) {
           </div>
         )}
 
+        {isOutOfStock && (
+          <div className={styles.outOfStockBadgeCenter}>
+            <span>HẾT HÀNG</span>
+          </div>
+        )}
+
         <div className={styles.badgeWrap}>
-          <Badge variant={product.badge === "SALE" ? "sale" : "default"}>{product.badge}</Badge>
+          <Badge variant={isOutOfStock ? "default" : product.badge === "SALE" ? "sale" : "default"}>
+            {isOutOfStock ? "HẾT HÀNG" : product.badge}
+          </Badge>
         </div>
         <div className={styles.wishlistWrap}>
           <WishlistButton productId={product.id} size="sm" />
         </div>
-        <button className={`btn btn-primary btn-sm btn-full ${styles.quickAdd}`} onClick={handleQuickAdd}>
-          Quick Add
-        </button>
+        {isOutOfStock ? (
+          <button
+            type="button"
+            disabled
+            className={styles.quickAddDisabled}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+          >
+            Hết hàng
+          </button>
+        ) : (
+          <button className={`btn btn-primary btn-sm btn-full ${styles.quickAdd}`} onClick={handleQuickAdd}>
+            Quick Add
+          </button>
+        )}
       </div>
 
       <div className={styles.info}>
         <span className={styles.category}>{product.category}</span>
         <span className={styles.name}>{product.name}</span>
-        <div className="price">
+        <div className="price" style={{ display: "flex", alignItems: "center", flexWrap: "wrap" }}>
           <span className="price-current">{formatPrice(product.price)}</span>
           {product.originalPrice && <span className="price-original">{formatPrice(product.originalPrice)}</span>}
+          {isOutOfStock && <span className={styles.outOfStockText}>• Hết hàng</span>}
         </div>
         {product.colors?.length > 0 && (
           <div className={styles.colors} aria-label={`Màu sắc: ${product.colors.map((c) => (typeof c === "object" ? c.name : c)).join(", ")}`}>

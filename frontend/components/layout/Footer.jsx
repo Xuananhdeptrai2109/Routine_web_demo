@@ -34,9 +34,9 @@ const columns = [
   {
     title: "ABOUT",
     links: [
-      { label: "About Us", href: "#" },
-      { label: "Stores", href: "#" },
-      { label: "Fashion Journal", href: "#" }
+      { label: "Hotline: 0901 800 888", href: "tel:0901800888" },
+      { label: "Email: cskh.routine@gmail.com", href: "mailto:cskh.routine@gmail.com" },
+      { label: "Địa chỉ: 123 Nguyễn Trãi, Phường Bến Thành, Quận 1, TP.HCM", href: "#" }
     ]
   }
 ];

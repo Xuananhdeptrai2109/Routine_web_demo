@@ -61,10 +61,16 @@ async function createPaymentUrl({
     throw err;
   }
 
-  const cleanIp =
-    ipAddr === '::1' || ipAddr === '::ffff:127.0.0.1' || !ipAddr
-      ? '127.0.0.1'
-      : ipAddr.split(',')[0].trim();
+  // Chuẩn hóa địa chỉ IP: VNPay Sandbox bắt buộc định dạng IPv4 chuẩn (A.B.C.D)
+  // Khi chạy trên Vercel/Cloudflare, x-forwarded-for thường là IPv6 hoặc danh sách IP phân tách bởi dấu phẩy
+  let cleanIp = ipAddr ? String(ipAddr).split(',')[0].trim() : '127.0.0.1';
+  if (cleanIp.startsWith('::ffff:')) {
+    cleanIp = cleanIp.replace('::ffff:', '');
+  }
+  const ipv4Pattern = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/;
+  if (!ipv4Pattern.test(cleanIp) || cleanIp === '::1') {
+    cleanIp = '127.0.0.1';
+  }
 
   const createDate = formatVNPayDate(new Date());
   const cleanOrderInfo = removeVietnameseTones(orderInfo || `Thanh toan don hang ${orderId}`).slice(0, 200);

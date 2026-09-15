@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useCart } from "@/context/CartContext";
 import { useToast } from "@/components/common/Toast";
 import { formatPrice } from "@/lib/format";
+import { isProductOutOfStock } from "@/data/products";
 import styles from "./InteractiveOutfitCard.module.css";
 
 export default function InteractiveOutfitCard({ outfit }) {
@@ -65,6 +66,10 @@ export default function InteractiveOutfitCard({ outfit }) {
 
   // Thêm lẻ 1 sản phẩm
   function handleAddSingleItem(p) {
+    if (isProductOutOfStock(p)) {
+      showToast(`Sản phẩm "${p.name}" hiện đã hết hàng.`);
+      return;
+    }
     const pid = p.id || p.productId;
     const sel = selections[pid] || {};
     const success = addToCart(p, {
@@ -92,21 +97,54 @@ export default function InteractiveOutfitCard({ outfit }) {
       <div className={styles.outfitItemsList}>
         {products.map((item) => {
           const pid = item.id || item.productId;
+          const isItemOutOfStock = isProductOutOfStock(item);
           const sel = selections[pid] || {};
           const sizes = Array.isArray(item.sizes) ? item.sizes : ["S", "M", "L", "XL"];
           const colors = Array.isArray(item.colors) ? item.colors : ["Đen", "Trắng", "Xám"];
 
           return (
             <div key={pid} className={styles.outfitItemRow}>
-              <Link href={`/product/${pid}`} className={styles.outfitItemThumb}>
-                <img src={item.image || "/images/placeholder.svg"} alt={item.name} />
+              <Link href={`/product/${pid}`} className={styles.outfitItemThumb} style={{ position: "relative" }}>
+                <img
+                  src={item.image || "/images/placeholder.svg"}
+                  alt={item.name}
+                  style={{
+                    filter: isItemOutOfStock ? "grayscale(40%) blur(1px) opacity(0.65)" : "none"
+                  }}
+                />
+                {isItemOutOfStock && (
+                  <span
+                    style={{
+                      position: "absolute",
+                      bottom: 2,
+                      left: 2,
+                      right: 2,
+                      background: "rgba(18, 18, 18, 0.8)",
+                      color: "#ffffff",
+                      fontSize: 9,
+                      fontWeight: 700,
+                      textAlign: "center",
+                      padding: "2px 0",
+                      borderRadius: 2
+                    }}
+                  >
+                    Hết hàng
+                  </span>
+                )}
               </Link>
 
               <div className={styles.outfitItemInfo}>
                 <Link href={`/product/${pid}`} className={styles.outfitItemName}>
                   {item.name}
                 </Link>
-                <div className={styles.outfitItemPrice}>{formatPrice(item.price)}</div>
+                <div className={styles.outfitItemPrice}>
+                  {formatPrice(item.price)}
+                  {isItemOutOfStock && (
+                    <span style={{ fontSize: 11, color: "#dc2626", fontWeight: 600, marginLeft: 6 }}>
+                      (Hết hàng)
+                    </span>
+                  )}
+                </div>
 
                 <div className={styles.outfitItemSelectors}>
                   <div className={styles.selectorGroup}>
@@ -115,6 +153,7 @@ export default function InteractiveOutfitCard({ outfit }) {
                       value={sel.size}
                       onChange={(e) => handleSizeChange(pid, e.target.value)}
                       className={styles.miniSelect}
+                      disabled={isItemOutOfStock}
                     >
                       {sizes.map((s) => (
                         <option key={s} value={s}>{s}</option>
@@ -128,6 +167,7 @@ export default function InteractiveOutfitCard({ outfit }) {
                       value={sel.color}
                       onChange={(e) => handleColorChange(pid, e.target.value)}
                       className={styles.miniSelect}
+                      disabled={isItemOutOfStock}
                     >
                       {colors.map((c) => (
                         <option key={c} value={c}>{c}</option>
@@ -139,9 +179,14 @@ export default function InteractiveOutfitCard({ outfit }) {
                     type="button"
                     className={styles.btnAddSingle}
                     onClick={() => handleAddSingleItem(item)}
-                    title="Thêm riêng món này"
+                    disabled={isItemOutOfStock}
+                    style={{
+                      opacity: isItemOutOfStock ? 0.5 : 1,
+                      cursor: isItemOutOfStock ? "not-allowed" : "pointer"
+                    }}
+                    title={isItemOutOfStock ? "Sản phẩm đã hết hàng" : "Thêm riêng món này"}
                   >
-                    + Thêm món này
+                    {isItemOutOfStock ? "Hết hàng" : "+ Thêm món này"}
                   </button>
                 </div>
               </div>

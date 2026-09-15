@@ -53,6 +53,12 @@ export function stockStatus(product) {
   return "IN_STOCK";
 }
 
+export function isProductOutOfStock(product) {
+  if (!product) return false;
+  if (product.status === "OUT_OF_STOCK" || product.isOutOfStock === true) return true;
+  return totalStock(product) <= 0;
+}
+
 export function discountPercent(product) {
   if (!product || !product.originalPrice || product.originalPrice <= product.price) return 0;
   return Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100);
