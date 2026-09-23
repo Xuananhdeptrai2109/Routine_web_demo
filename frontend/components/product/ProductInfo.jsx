@@ -343,8 +343,6 @@ export default function ProductInfo({ product, isOutOfStock: propOutOfStock }) {
 
       <div>
         <AccordionRow title="Product Description" content={product.description} />
-        <AccordionRow title="Materials" content={product.materials || product.material} />
-        <AccordionRow title="Care" content={product.care || product.careInstructions} />
       </div>
     </div>
   );

@@ -23,15 +23,6 @@ const columns = [
     ]
   },
   {
-    title: "SUPPORT",
-    links: [
-      { label: "Contact", href: "#" },
-      { label: "Shipping", href: "#" },
-      { label: "Returns", href: "#" },
-      { label: "FAQ", href: "#" }
-    ]
-  },
-  {
     title: "ABOUT",
     links: [
       { label: "Hotline: 0901 800 888", href: "tel:0901800888" },
@@ -125,7 +116,7 @@ export default function Footer() {
         }
         .footer-grid {
           display: grid;
-          grid-template-columns: repeat(4, 1fr);
+          grid-template-columns: repeat(3, 1fr);
           gap: 32px;
         }
         .footer-col-icon { display: none; }
