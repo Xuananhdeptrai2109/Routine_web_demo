@@ -84,7 +84,7 @@ function FooterColumn({ title, links }) {
 export default function Footer() {
   return (
     <footer style={{ background: "var(--color-bg-secondary)", marginTop: 40 }}>
-      <div className="container" style={{ padding: "56px 24px 32px" }}>
+      <div className="container footer-container">
         <div style={{ marginBottom: 40 }}>
           <span style={{ fontSize: 20, fontWeight: 700, letterSpacing: "0.14em" }}>ROUTINE</span>
         </div>
@@ -119,6 +119,10 @@ export default function Footer() {
       </div>
 
       <style>{`
+        .footer-container {
+          padding-top: 56px;
+          padding-bottom: 32px;
+        }
         .footer-grid {
           display: grid;
           grid-template-columns: repeat(4, 1fr);
@@ -127,6 +131,10 @@ export default function Footer() {
         .footer-col-icon { display: none; }
         .footer-col-links { display: block; }
         @media (max-width: 767px) {
+          .footer-container {
+            padding-top: 40px;
+            padding-bottom: 24px;
+          }
           .footer-grid {
             grid-template-columns: 1fr;
             gap: 0;

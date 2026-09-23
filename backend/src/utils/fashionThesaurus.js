@@ -168,7 +168,103 @@ function normalizeFashionQuery(text) {
     result.budget = Math.round(budget);
   }
 
+  // 7. Phân tích Chiều cao & Cân nặng (Tư vấn kích cỡ)
+  const sizeMetrics = extractHeightAndWeight(text);
+  result.height = sizeMetrics.height;
+  result.weight = sizeMetrics.weight;
+  result.isAskingForSize = sizeMetrics.isAskingForSize;
+
   return result;
+}
+
+/**
+ * Trích xuất Chiều cao (cm) và Cân nặng (kg) từ văn bản tiếng Việt
+ */
+function extractHeightAndWeight(text) {
+  if (!text || typeof text !== 'string') return { height: null, weight: null, isAskingForSize: false };
+  const lower = text.toLowerCase().replace(/,/g, '.');
+
+  let height = null;
+  let weight = null;
+
+  // 1. Tìm Chiều Cao (cm)
+  // Mẫu 1: "1m75", "1m7", "1 mét 75", "cao 1m70"
+  const mMatch = lower.match(/(?:cao|chiều cao)?\s*([12])\s*(?:m|mét|\^)\s*(\d{1,2})(?:\s*m)?/);
+  if (mMatch) {
+    const meter = parseInt(mMatch[1], 10);
+    let cmPart = mMatch[2];
+    if (cmPart.length === 1) {
+      cmPart = cmPart + '0';
+    }
+    height = meter * 100 + parseInt(cmPart, 10);
+  }
+
+  // Mẫu 2: "1.75m", "1.7m", "1.75 mét"
+  if (!height) {
+    const dotMeterMatch = lower.match(/([12]\.\d{1,2})\s*(?:m|mét)/);
+    if (dotMeterMatch) {
+      const val = parseFloat(dotMeterMatch[1]);
+      if (val >= 1.3 && val <= 2.2) {
+        height = Math.round(val * 100);
+      }
+    }
+  }
+
+  // Mẫu 3: "m72", "m68", "m80", "m60"
+  if (!height) {
+    const shortMeterMatch = lower.match(/(?:^|\s|[^\w])m([5-9]\d)(?:\s|[^\w]|$)/);
+    if (shortMeterMatch) {
+      height = 100 + parseInt(shortMeterMatch[1], 10);
+    }
+  }
+
+  // Mẫu 4: "172cm", "172 cm", "172centimet", "cao 172"
+  if (!height) {
+    const cmMatch = lower.match(/(?:cao\s*)?(\d{3})\s*(?:cm|centimet)/) || lower.match(/cao\s*(\d{3})(?:\s|[^\w]|$)/);
+    if (cmMatch) {
+      const val = parseInt(cmMatch[1], 10);
+      if (val >= 130 && val <= 220) {
+        height = val;
+      }
+    }
+  }
+
+  // 2. Tìm Cân Nặng (kg)
+  // Hỗ trợ unicode tiếng Việt (ký, kí, cân)
+  const weightMatch = lower.match(/(\d{2,3}(?:\.\d+)?)\s*(?:kg|kí|ký|cân|can|kilo|kilogram)(?:[^\p{L}\p{N}]|$)/u)
+    || lower.match(/(?:nặng|cân nặng)\s*(\d{2,3}(?:\.\d+)?)/);
+  if (weightMatch) {
+    const val = parseFloat(weightMatch[1]);
+    if (val >= 35 && val <= 180) {
+      weight = Math.round(val);
+    }
+  }
+
+  // Trường hợp viết liền: "1m70 65" hoặc "172cm 68"
+  if (height && !weight) {
+    const trailingWeight = lower.match(/(?:[12]m\d{1,2}|m\d{2}|\d{3}\s*cm)\s+(?:nặng\s*)?(\d{2,3})\b/);
+    if (trailingWeight) {
+      const wVal = parseInt(trailingWeight[1], 10);
+      if (wVal >= 35 && wVal <= 180) {
+        weight = wVal;
+      }
+    }
+  }
+
+  // Nhận diện ý định hỏi size
+  const isAskingForSize =
+    lower.includes('size') ||
+    lower.includes('kích cỡ') ||
+    lower.includes('kich co') ||
+    lower.includes('vừa không') ||
+    lower.includes('vua khong') ||
+    lower.includes('mặc số mấy') ||
+    lower.includes('mặc số nào') ||
+    lower.includes('chọn size') ||
+    (height !== null && weight !== null) ||
+    ((height !== null || weight !== null) && (lower.includes('tư vấn') || lower.includes('tu van') || lower.includes('mặc') || lower.includes('hợp') || lower.includes('cao') || lower.includes('nặng')));
+
+  return { height, weight, isAskingForSize };
 }
 
 module.exports = {
@@ -177,5 +273,6 @@ module.exports = {
   COLOR_SYNONYMS,
   OCCASION_SYNONYMS,
   GENDER_SYNONYMS,
+  extractHeightAndWeight,
   normalizeFashionQuery,
 };

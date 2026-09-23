@@ -95,7 +95,16 @@
   .heroContent {
     margin: 0 20px;
     padding: 24px 24px;
-    max-width: 100%;
+    max-width: calc(100% - 40px);
+  }
+}
+
+@media (max-width: 640px) {
+  .heroContent {
+    margin: 0 12px;
+    padding: 20px 16px;
+    max-width: calc(100% - 24px);
+    border-radius: 14px;
   }
 }
 

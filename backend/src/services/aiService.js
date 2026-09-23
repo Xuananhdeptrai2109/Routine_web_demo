@@ -5,6 +5,7 @@
 
 const prisma = require('../config/prisma');
 const outfitService = require('./outfitService');
+const sizeGuideService = require('./sizeGuideService');
 const { normalizeFashionQuery } = require('../utils/fashionThesaurus');
 
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
@@ -153,7 +154,7 @@ async function extractFashionIntent(userMessage, history = []) {
       isAskingForOutfit: false,
       requestType: 'greeting',
       userIntentSummary: userMessage,
-      gender: ruleBased.gender || 'men',
+      gender: ruleBased.gender || null,
       excludeProductNames: [],
       keepProductNames: [],
       previousOutfitIds,
@@ -239,7 +240,7 @@ Lưu ý:
           color: parsed.color || ruleBased.color || null,
           occasion: parsed.occasion || ruleBased.occasion || null,
           budget: parsed.budget || ruleBased.budget || null,
-          gender: parsed.gender || ruleBased.gender || 'men',
+          gender: parsed.gender || ruleBased.gender || null,
           excludeProductNames: Array.isArray(parsed.excludeProductNames) ? parsed.excludeProductNames : ruleExcludeProducts,
           keepProductNames: Array.isArray(parsed.keepProductNames) ? parsed.keepProductNames : ruleKeepProducts,
           previousOutfitIds,
@@ -253,7 +254,7 @@ Lưu ý:
     isAskingForOutfit: !isGreeting,
     requestType: ruleRequestType,
     userIntentSummary: userMessage,
-    gender: ruleBased.gender || 'men',
+    gender: ruleBased.gender || null,
     excludeProductNames: ruleExcludeProducts,
     keepProductNames: ruleKeepProducts,
     previousOutfitIds,
@@ -323,9 +324,11 @@ function formatProductForStylist(p, intent = {}) {
   const finalSizes = pSizes.length > 0 ? pSizes : ['S', 'M', 'L', 'XL'];
   const finalColors = pColors.length > 0 ? pColors : ['Đen', 'Trắng', 'Xám'];
 
-  const selectedSize = intent.fit === 'oversize'
-    ? (finalSizes.includes('L') ? 'L' : (finalSizes.includes('XL') ? 'XL' : finalSizes[0]))
-    : (finalSizes.includes('M') ? 'M' : finalSizes[0]);
+  const selectedSize = (intent.recommendedSize && finalSizes.includes(intent.recommendedSize))
+    ? intent.recommendedSize
+    : (intent.fit === 'oversize'
+      ? (finalSizes.includes('L') ? 'L' : (finalSizes.includes('XL') ? 'XL' : finalSizes[0]))
+      : (finalSizes.includes('M') ? 'M' : finalSizes[0]));
 
   const selectedColor = (intent.color && finalColors.find((c) => c.toLowerCase().includes(intent.color)))
     || finalColors[0]
@@ -495,7 +498,7 @@ async function findBestCuratedOutfit(intent, userMessage = '') {
  * Tự động tìm kiếm và ghép bộ phối đồ linh hoạt (Dynamic Outfit Assembly) từ Database MySQL
  */
 async function assembleDynamicOutfit(intent, currentProduct = null, userMessage = '') {
-  const gender = intent.gender || 'men';
+  const gender = intent.gender || 'unisex';
   const targetColor = intent.color || null;
   const targetFit = intent.fit || null;
   const budget = intent.budget || 2000000;
@@ -690,36 +693,119 @@ async function chatWithStylist({ message, history = [], currentProductId = null,
   // 1. Phân tích intent và chuẩn hóa từ vựng tiếng Việt với ngữ cảnh đa lượt
   const intent = await extractFashionIntent(message, history);
 
-  // Áp dụng sở thích người dùng (userPreferences) nếu câu chat chưa chỉ định rõ
-  if (userPreferences) {
-    if (userPreferences.gender) {
-      const g = String(userPreferences.gender).toLowerCase().trim();
-      const mLower = (message || '').toLowerCase();
-      const hasExplicitGenderInMessage =
-        mLower.includes('nam') ||
-        mLower.includes('nữ') ||
-        mLower.includes('con gái') ||
-        mLower.includes('phái đẹp') ||
-        mLower.includes('men') ||
-        mLower.includes('women');
+  const mLower = (message || '').toLowerCase();
+  const hasExplicitGenderInMessage =
+    mLower.includes('nam') ||
+    mLower.includes('con trai') ||
+    mLower.includes('đàn ông') ||
+    mLower.includes('phái mạnh') ||
+    mLower.includes('cho nam') ||
+    mLower.includes('men') ||
+    mLower.includes('nữ') ||
+    mLower.includes('nu') ||
+    mLower.includes('con gái') ||
+    mLower.includes('phụ nữ') ||
+    mLower.includes('phái đẹp') ||
+    mLower.includes('cho nữ') ||
+    mLower.includes('women');
 
-      if (!hasExplicitGenderInMessage) {
-        if (g === 'women' || g === 'nữ' || g === 'nu') {
-          intent.gender = 'women';
-        } else if (g === 'men' || g === 'nam') {
-          intent.gender = 'men';
-        } else if (g === 'unisex') {
-          intent.gender = 'unisex';
-        }
-      }
+  // Xác định giới tính mục tiêu (Effective Gender):
+  // 1. Ưu tiên ý định cụ thể trong tin nhắn nếu khách yêu cầu rõ ràng
+  // 2. Nếu khách đã đăng ký / đăng nhập:
+  //    - Nam ('men'): chỉ gợi ý đồ nam và unisex
+  //    - Nữ ('women'): chỉ gợi ý đồ nữ và unisex
+  //    - Khác ('unisex'): không lọc giới tính, lấy TẤT CẢ sản phẩm trong kho
+  // 3. Nếu khách chưa đăng nhập (Guest): giống như 'Khác', đưa ra TẤT CẢ sản phẩm trong kho
+  if (hasExplicitGenderInMessage && intent.gender) {
+    // Giữ nguyên intent.gender được trích xuất từ câu chat
+  } else if (userPreferences && userPreferences.gender) {
+    const g = String(userPreferences.gender).toLowerCase().trim();
+    if (g === 'women' || g === 'nữ' || g === 'nu') {
+      intent.gender = 'women';
+    } else if (g === 'men' || g === 'nam') {
+      intent.gender = 'men';
+    } else {
+      intent.gender = 'unisex';
     }
-    if (userPreferences.style && !intent.style) {
-      intent.style = userPreferences.style;
+  } else {
+    // Tài khoản chưa đăng nhập: mặc định là 'unisex' (tất cả sản phẩm)
+    intent.gender = intent.gender || 'unisex';
+  }
+
+  if (userPreferences?.style && !intent.style) {
+    intent.style = userPreferences.style;
+  }
+
+  // 2. Tra cứu và tính toán tư vấn kích cỡ (Size Consultation) từ MySQL
+  let sizeRecommendation = null;
+  if (intent.height || intent.weight) {
+    sizeRecommendation = await sizeGuideService.recommendSize({
+      height: intent.height,
+      weight: intent.weight,
+      fitPreference: intent.fit,
+    });
+    if (sizeRecommendation?.size) {
+      intent.recommendedSize = sizeRecommendation.size;
     }
   }
 
-  // 2. Nếu khách chỉ chào hỏi hoặc hỏi chuyện chung (không yêu cầu tìm đồ cụ thể)
-  if (!intent.isAskingForOutfit) {
+  // 2.1. Nếu khách hỏi size nhưng chưa cung cấp số đo
+  if (intent.isAskingForSize && !intent.height && !intent.weight) {
+    return {
+      message: 'Dạ Routine có đầy đủ 6 kích cỡ chuẩn từ **XS, S, M, L, XL đến XXL**. Bạn hãy chia sẻ chiều cao và cân nặng của mình (ví dụ: *“mình cao 1m70 nặng 65kg”*) để mình tra cứu bảng size trong cơ sở dữ liệu và tư vấn kích cỡ chuẩn nhất cho bạn nhé!',
+      intent,
+      outfit: null,
+      products: [],
+      total: 0,
+      sizeRecommendation: null,
+      followUps: [
+        'Mình cao 1m60 nặng 50kg',
+        'Mình cao 1m70 nặng 65kg',
+        'Mình cao 1m78 nặng 75kg',
+        'Xem bảng thông số size chi tiết',
+      ],
+    };
+  }
+
+  // 2.2. Nếu khách chỉ hỏi tư vấn size hoặc đưa số đo mà không yêu cầu tìm dòng sản phẩm cụ thể
+  const isPureSizeConsultation =
+    (intent.height || intent.weight) &&
+    (!intent.category && (!intent.categories || intent.categories.length === 0) && !intent.occasion);
+
+  if (isPureSizeConsultation && sizeRecommendation) {
+    let outfit = await assembleDynamicOutfit(intent, null, message);
+    if (!outfit) {
+      const existing = await outfitService.getOutfits({ limit: 1 });
+      if (existing.items?.[0]) {
+        outfit = formatOutfitForStylist(existing.items[0], intent);
+      }
+    }
+
+    const followUps = [
+      `Gợi ý áo polo phối quần tây cho size ${sizeRecommendation.size}`,
+      `Tìm áo phông oversize size ${sizeRecommendation.size} dạo phố`,
+      intent.fit === 'oversize' ? 'Nếu mình muốn mặc vừa sát người thì sao?' : 'Mình thích mặc form rộng thoải mái thì chọn size nào?',
+      'Xem thêm bảng số đo chi tiết của Routine',
+    ];
+
+    let fullMessage = `Dạ chào bạn! ${sizeRecommendation.reason}`;
+    if (outfit && outfit.products?.length > 0) {
+      fullMessage += `\n\nRoutine cũng đã chuẩn bị sẵn gợi ý set đồ theo đúng **Size ${sizeRecommendation.size}** để bạn tham khảo ngay bên dưới nhé:`;
+    }
+
+    return {
+      message: fullMessage,
+      intent,
+      outfit,
+      products: outfit?.products || [],
+      total: outfit?.total || 0,
+      sizeRecommendation,
+      followUps,
+    };
+  }
+
+  // 2.3. Nếu khách chỉ chào hỏi hoặc hỏi chuyện chung (không yêu cầu tìm đồ cụ thể)
+  if (!intent.isAskingForOutfit && !intent.height && !intent.weight) {
     const greetingTemplates = [
       `Dạ Routine xin chào bạn! Mình là AI Stylist của Routine, rất vui được đồng hành cùng bạn trên hành trình định hình phong cách cá nhân. Hôm nay bạn đang muốn tìm kiếm trang phục cho dịp nào—đi làm công sở, dạo phố cuối tuần, hay một buổi hẹn hò đặc biệt? Hãy chia sẻ với mình nhé!`,
       `Xin chào bạn 👋! Mình là Trợ lý Thời trang Routine. Bạn đang cần tư vấn set đồ cho dịp nào, hay có món đồ nào (áo thun, sơ mi, polo, quần tây...) muốn phối cùng không? Mình sẵn sàng hỗ trợ bạn ngay!`,
@@ -733,6 +819,7 @@ async function chatWithStylist({ message, history = [], currentProductId = null,
       outfit: null,
       products: [],
       total: 0,
+      sizeRecommendation: null,
       followUps: [
         'Tư vấn set đồ công sở lịch sự nam',
         'Tìm áo phông dáng lớn màu xám dạo phố',
@@ -796,7 +883,7 @@ Quy tắc trả lời:
         parts: [
           {
             text: `Khách hàng: "${message}".
-Tiêu chí đã chuẩn hóa: Dáng mặc: ${fitNote}, Màu: ${intent.color || 'tự nhiên'}, Dịp: ${intent.occasion || 'tự do'}, Ngân sách: ${intent.budget ? intent.budget.toLocaleString('vi-VN') + 'đ' : 'linh hoạt'}.
+Tiêu chí đã chuẩn hóa: Dáng mặc: ${fitNote}, Màu: ${intent.color || 'tự nhiên'}, Dịp: ${intent.occasion || 'tự do'}, Ngân sách: ${intent.budget ? intent.budget.toLocaleString('vi-VN') + 'đ' : 'linh hoạt'}.${sizeRecommendation ? `\nThông tin tư vấn size: Khách hàng phù hợp nhất với Size ${sizeRecommendation.size}. Chi tiết: ${sizeRecommendation.reason}. Hãy tư vấn khách chọn size này cho các món đồ trong set.` : ''}
 Hệ thống đã chọn set: ${itemsText}. Tổng giá: ${outfit?.total?.toLocaleString('vi-VN')}đ.
 Hãy viết lời tư vấn cho khách.`,
           },
@@ -828,11 +915,16 @@ Hãy viết lời tư vấn cho khách.`,
 
   // 7. Sinh 3 câu hỏi gợi ý tiếp theo thông minh dựa theo ngữ cảnh
   const followUps = [
-    intent.requestType === 'change_bottom' ? 'Đổi sang áo khác để phối cùng quần này' : 'Đổi sang quần khác để phối',
+    sizeRecommendation ? `Đổi sang các món đồ khác cho size ${sizeRecommendation.size}` : (intent.requestType === 'change_bottom' ? 'Đổi sang áo khác để phối cùng quần này' : 'Đổi sang quần khác để phối'),
     intent.fit === 'oversize' ? 'Có set nào dáng ôm gọn gàng hơn không?' : 'Gợi ý thêm áo form rộng dạo phố',
     intent.occasion === 'office' ? 'Tìm set dạo phố thoải mái cuối tuần' : 'Tư vấn set đồ công sở lịch sự',
     'Gợi ý set đồ ngân sách dưới 800k',
   ];
+
+  // Bổ sung lời khuyên size vào stylistAdvice nếu có
+  if (sizeRecommendation && !stylistAdvice.includes(sizeRecommendation.size)) {
+    stylistAdvice = `Dạ chào bạn! ${sizeRecommendation.reason}\n\n${stylistAdvice}`;
+  }
 
   return {
     message: stylistAdvice,
@@ -840,6 +932,7 @@ Hãy viết lời tư vấn cho khách.`,
     outfit,
     products: outfit?.products || [],
     total: outfit?.total || 0,
+    sizeRecommendation: sizeRecommendation || null,
     followUps,
   };
 }
@@ -850,6 +943,7 @@ Hãy viết lời tư vấn cho khách.`,
 async function generateOutfitRecommendation({ occasion, style, budget, gender, userMessage } = {}) {
   const result = await chatWithStylist({
     message: userMessage || `${occasion || 'hàng ngày'} ${style || 'tối giản'} ${budget || ''}`,
+    userPreferences: gender ? { gender } : null,
   });
   return result;
 }

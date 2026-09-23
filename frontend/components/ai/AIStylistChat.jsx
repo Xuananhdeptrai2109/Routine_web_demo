@@ -6,22 +6,69 @@ import { sendStylistChatMessage } from "@/lib/aiStylistService";
 import { useUser } from "@/context/UserContext";
 import styles from "./AIStylistChat.module.css";
 
-const INITIAL_QUICK_CHIPS = [
-  "Tìm áo phông dáng lớn màu xám dạo phố",
-  "Tư vấn set đồ công sở lịch sự nam",
-  "Outfit hẹn hò cuối tuần dưới 1 triệu",
-  "Gợi ý áo polo kết hợp quần tây thanh lịch",
-];
+const GENDER_QUICK_CHIPS = {
+  women: [
+    "Tư vấn set đồ nữ thanh lịch đi làm",
+    "Áo sơ mi kết hợp chân váy dạo phố",
+    "Outfit hẹn hò nữ cuối tuần dưới 1 triệu",
+    "Gợi ý đầm/set đồ phong cách tối giản",
+  ],
+  men: [
+    "Tư vấn set đồ công sở lịch sự nam",
+    "Gợi ý áo polo kết hợp quần tây thanh lịch",
+    "Outfit dạo phố năng động nam",
+    "Tìm áo phông dáng lớn màu xám",
+  ],
+  default: [
+    "Tìm áo phông dáng lớn màu xám dạo phố",
+    "Tư vấn set đồ công sở lịch sự",
+    "Outfit hẹn hò cuối tuần dưới 1 triệu",
+    "Gợi ý áo polo kết hợp quần tây thanh lịch",
+  ],
+};
+
+function getWelcomeConfig(user) {
+  const gender = user?.gender;
+  const name = user?.name ? ` ${user.name}` : "";
+
+  if (gender === "women") {
+    return {
+      text: `Xin chào${name} 👋! Tôi là Trợ lý Thời trang AI Stylist của Routine. Rất vui được hỗ trợ tư vấn trang phục nữ chuẩn phong cách cho bạn. Hôm nay bạn muốn tìm đồ theo dịp nào (công sở, dạo phố, hẹn hò)?`,
+      chips: GENDER_QUICK_CHIPS.women,
+    };
+  }
+
+  if (gender === "men") {
+    return {
+      text: `Xin chào${name} 👋! Tôi là Trợ lý Thời trang AI Stylist của Routine. Rất vui được hỗ trợ tư vấn trang phục nam chuẩn gu cho bạn. Hôm nay bạn muốn tìm đồ theo dịp nào (công sở, dạo phố, hẹn hò)?`,
+      chips: GENDER_QUICK_CHIPS.men,
+    };
+  }
+
+  if (gender === "unisex") {
+    return {
+      text: `Xin chào${name} 👋! Tôi là Trợ lý Thời trang AI Stylist của Routine. Tôi sẵn sàng gợi ý và phối đồ từ tất cả bộ sưu tập thời trang trong kho cho bạn. Hôm nay bạn muốn tìm đồ theo phong cách nào?`,
+      chips: GENDER_QUICK_CHIPS.default,
+    };
+  }
+
+  return {
+    text: "Xin chào 👋! Tôi là Trợ lý Thời trang AI Stylist của Routine. Hôm nay bạn muốn tìm trang phục theo dịp nào, dáng mặc (form rộng, vừa, ôm) hay phong cách gì?",
+    chips: GENDER_QUICK_CHIPS.default,
+  };
+}
 
 export default function AIStylistChat({ initialPrompt = "", currentProductId = null, embedded = false }) {
   const { user, isLoggedIn, openAuthPrompt } = useUser();
+  const welcome = getWelcomeConfig(user);
+
   const [messages, setMessages] = useState([
     {
       id: "msg-welcome",
       role: "ai",
-      text: "Xin chào 👋! Tôi là Trợ lý Thời trang AI Stylist của Routine. Hôm nay bạn muốn tìm trang phục theo dịp nào, dáng mặc (form rộng, vừa, ôm) hay phong cách gì?",
+      text: welcome.text,
       outfit: null,
-      followUps: INITIAL_QUICK_CHIPS,
+      followUps: welcome.chips,
     },
   ]);
 

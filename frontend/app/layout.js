@@ -14,6 +14,12 @@ export const metadata = {
     "Routine — nền tảng thời trang tối giản giúp bạn khám phá sản phẩm, xây dựng outfit và nhận gợi ý phong cách cá nhân."
 };
 
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+};
+
 export default function RootLayout({ children }) {
   return (
     <html lang="vi">

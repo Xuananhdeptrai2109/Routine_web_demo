@@ -1,3 +1,4 @@
+const prisma = require('../config/prisma');
 const aiService = require('../services/aiService');
 const { sendSuccess, sendError } = require('../utils/response');
 
@@ -12,11 +13,32 @@ async function chat(req, res, next) {
       return sendError(res, 'Vui lòng nhập nội dung câu hỏi cho AI Stylist', 400);
     }
 
+    let resolvedPreferences = userPreferences ? { ...userPreferences } : null;
+
+    // Tự động nạp giới tính và gu phong cách từ tài khoản đã đăng nhập trong MySQL
+    if (req.userId && (!resolvedPreferences || !resolvedPreferences.gender)) {
+      try {
+        const dbUser = await prisma.user.findUnique({
+          where: { id: req.userId },
+          select: { gender: true, stylePreference: true },
+        });
+        if (dbUser) {
+          resolvedPreferences = {
+            ...(resolvedPreferences || {}),
+            gender: dbUser.gender || 'unisex',
+            style: resolvedPreferences?.style || dbUser.stylePreference || 'minimal',
+          };
+        }
+      } catch (err) {
+        console.warn('[aiController] Lỗi tìm user profile:', err.message);
+      }
+    }
+
     const result = await aiService.chatWithStylist({
       message: message.trim(),
       history: Array.isArray(history) ? history : [],
       currentProductId: currentProductId || null,
-      userPreferences: userPreferences || null,
+      userPreferences: resolvedPreferences,
     });
 
     return sendSuccess(

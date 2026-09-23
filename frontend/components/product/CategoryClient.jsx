@@ -91,7 +91,7 @@ export default function CategoryClient({ initialCategory, initialProducts = [], 
         )}
       </div>
 
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, gap: 16 }}>
+      <div className="category-toolbar">
         <button
           type="button"
           className="btn btn-secondary mobile-only"
@@ -100,7 +100,7 @@ export default function CategoryClient({ initialCategory, initialProducts = [], 
           Bộ lọc ({Object.keys(filters).length})
         </button>
 
-        <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>
+        <span className="category-count">
           Hiển thị <strong>{finalProducts.length}</strong> sản phẩm
         </span>
 
@@ -142,18 +142,47 @@ export default function CategoryClient({ initialCategory, initialProducts = [], 
       )}
 
       <style>{`
+        .category-toolbar {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 24px;
+          gap: 12px;
+          flex-wrap: wrap;
+        }
+        .category-count {
+          color: var(--color-text-secondary);
+          font-size: 14px;
+        }
         .category-layout {
           display: grid;
           grid-template-columns: 260px 1fr;
           gap: 40px;
           align-items: start;
+          width: 100%;
+          min-width: 0;
+        }
+        .category-main {
+          min-width: 0;
+          width: 100%;
         }
         @media (max-width: 1023px) {
           .category-layout {
             grid-template-columns: 1fr;
+            gap: 20px;
           }
           .desktop-only {
             display: none !important;
+          }
+        }
+        @media (max-width: 640px) {
+          .category-toolbar {
+            gap: 10px;
+          }
+          .category-count {
+            order: 3;
+            width: 100%;
+            font-size: 13px;
           }
         }
         @media (min-width: 1024px) {

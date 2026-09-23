@@ -143,11 +143,28 @@
   }
 }
 
-@media (max-width: 480px) {
+@media (max-width: 600px) {
+  .aiFloatingRoot {
+    bottom: 16px;
+    right: 16px;
+  }
+
+  .aiFloatingTrigger {
+    padding: 8px 14px;
+  }
+
+  .aiFloatingTrigger.isActive {
+    padding: 10px;
+  }
+
   .aiPopupWindow {
-    width: calc(100vw - 24px);
-    right: -12px;
-    bottom: 58px;
-    height: 75vh;
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    bottom: 68px;
+    width: auto;
+    max-width: none;
+    height: min(580px, calc(100vh - 84px));
+    border-radius: 16px;
   }
 }

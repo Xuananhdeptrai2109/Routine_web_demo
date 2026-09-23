@@ -88,7 +88,7 @@ export default function Header() {
             >
               <MenuIcon />
             </button>
-            <Logo />
+            <Logo className={styles.desktopLogo} />
             <nav className={styles.nav} aria-label="Điều hướng chính">
               {primaryNav.map((item) => (
                 <Link key={item.href} href={item.href} className={styles.navLink}>

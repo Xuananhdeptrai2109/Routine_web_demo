@@ -288,7 +288,7 @@ export default function HomePage() {
             <span className="eyebrow">Hot right now</span>
             <h2 className="section-title">Trending Now</h2>
           </div>
-          <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
+          <div style={{ display: "flex", gap: 8, marginBottom: 24, flexWrap: "wrap" }}>
             {genderFilters.map((f) => (
               <button
                 key={f.label}

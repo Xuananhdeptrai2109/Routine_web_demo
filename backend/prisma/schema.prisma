@@ -357,4 +357,18 @@ model MediaFile {
   @@map("media_files")
 }
 
+model SizeGuide {
+  id        String   @id @default(uuid())
+  size      String   @unique @db.VarChar(20)
+  minHeight Int      @map("min_height")
+  maxHeight Int      @map("max_height")
+  minWeight Int      @map("min_weight")
+  maxWeight Int      @map("max_weight")
+  order     Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("size_guides")
+}
+
 
