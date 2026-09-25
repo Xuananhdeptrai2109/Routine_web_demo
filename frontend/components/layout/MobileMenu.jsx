@@ -10,7 +10,6 @@ const links = [
   { label: "New Arrivals", href: "/category/new-arrivals" },
   { label: "Men", href: "/category/men" },
   { label: "Women", href: "/category/women" },
-  { label: "Unisex", href: "/category/unisex" },
   { label: "Smart Outfit", href: "/smart-outfit" },
   { label: "AI Stylist", href: "/smart-outfit/ai-stylist" },
   { label: "My Orders", href: "/orders" }

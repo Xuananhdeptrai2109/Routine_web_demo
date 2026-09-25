@@ -18,7 +18,6 @@ const primaryNav = [
   { label: "NEW", href: "/category/new-arrivals" },
   { label: "MEN", href: "/category/men" },
   { label: "WOMEN", href: "/category/women" },
-  { label: "UNISEX", href: "/category/unisex" },
 ];
 
 export default function Header() {

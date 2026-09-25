@@ -7,7 +7,6 @@ import CheckoutHeader from "@/components/checkout/CheckoutHeader";
 import PaymentMethod from "@/components/payment/PaymentMethod";
 import CardPaymentForm from "@/components/payment/CardPaymentForm";
 import PaymentSummary from "@/components/payment/PaymentSummary";
-import VNPayTestCredentials from "@/components/payment/VNPayTestCredentials";
 import { useCart } from "@/context/CartContext";
 import { useCheckout } from "@/context/CheckoutContext";
 import { useUser } from "@/context/UserContext";
@@ -157,18 +156,9 @@ export default function PaymentPage() {
             <PaymentMethod value={paymentMethodId} onChange={setPaymentMethodId} />
 
             {paymentMethodId === "vnpay" && (
-              <>
-                <div className="reservation-badge">
-                  <div className="reservation-badge-icon">⏱️</div>
-                  <div>
-                    <div className="reservation-badge-title">Chính sách giữ hàng 5 phút</div>
-                    <div className="reservation-badge-desc">
-                      Khi bấm đặt hàng, sản phẩm sẽ được khóa giữ trong 5 phút để bảo đảm không bị tranh mua. Giỏ hàng của bạn sẽ được giữ nguyên vẹn nếu giao dịch bị hủy hoặc chưa hoàn tất.
-                    </div>
-                  </div>
-                </div>
-                <VNPayTestCredentials />
-              </>
+              <p style={{ marginTop: 16, fontSize: 14, color: "var(--color-text-secondary)" }}>
+                Bạn sẽ được chuyển hướng an toàn tới cổng thanh toán VNPay để hoàn tất giao dịch.
+              </p>
             )}
 
             {paymentMethodId === "cod" && (
@@ -211,31 +201,6 @@ export default function PaymentPage() {
           font-size: 15px;
           letter-spacing: 0.04em;
           margin-bottom: 16px;
-        }
-        .reservation-badge {
-          display: flex;
-          align-items: flex-start;
-          gap: 12px;
-          background: #f0fdf4;
-          border: 1px solid #bbf7d0;
-          border-radius: 8px;
-          padding: 12px 14px;
-          margin-top: 16px;
-        }
-        .reservation-badge-icon {
-          font-size: 20px;
-          line-height: 1;
-        }
-        .reservation-badge-title {
-          font-size: 13px;
-          font-weight: 700;
-          color: #166534;
-          margin-bottom: 2px;
-        }
-        .reservation-badge-desc {
-          font-size: 12px;
-          color: #15803d;
-          line-height: 1.4;
         }
         @media (max-width: 1023px) {
           .payment-layout {

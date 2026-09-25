@@ -32,7 +32,20 @@ const columns = [
   }
 ];
 
-const social = ["Facebook", "Instagram", "TikTok"];
+const social = [
+  {
+    name: "Facebook",
+    href: "https://web.facebook.com/profile.php?id=61594443511516",
+  },
+  {
+    name: "Instagram",
+    href: "https://www.instagram.com/routine_official",
+  },
+  {
+    name: "TikTok",
+    href: "https://www.tiktok.com/@routine.ptit?_r=1&_t=ZS-9A1zNiAXhKb",
+  },
+];
 
 function FooterColumn({ title, links }) {
   const [open, setOpen] = useState(false);
@@ -101,8 +114,14 @@ export default function Footer() {
           <p style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>© 2026 Routine Smart Fashion</p>
           <div style={{ display: "flex", gap: 16 }}>
             {social.map((s) => (
-              <a key={s} href="#" style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>
-                {s}
+              <a
+                key={s.name}
+                href={s.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ fontSize: 13, color: "var(--color-text-secondary)" }}
+              >
+                {s.name}
               </a>
             ))}
           </div>
