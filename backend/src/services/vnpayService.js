@@ -151,6 +151,24 @@ async function verifyReturnUrl(queryParams) {
           updateData.orderStatus = 'CONFIRMED';
           // Commit stock trừ kho vĩnh viễn và dọn dẹp giỏ hàng
           await stockReservationService.commitStock(orderId);
+
+          // Cập nhật số lượng đã bán thực tế vào database cho các sản phẩm trong đơn
+          try {
+            const orderItems = await prisma.orderItem.findMany({ where: { orderId } });
+            for (const it of orderItems) {
+              if (it.productId) {
+                await prisma.product
+                  .update({
+                    where: { id: it.productId },
+                    data: { soldCount: { increment: it.quantity } },
+                  })
+                  .catch(() => {});
+              }
+            }
+          } catch (soldErr) {
+            console.warn('[vnpayService] Lỗi cập nhật soldCount:', soldErr.message);
+          }
+
           if (order.userId || order.guestSessionId) {
             try {
               cartService.clearCart(order.userId || order.guestSessionId);

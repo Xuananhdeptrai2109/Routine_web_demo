@@ -75,6 +75,7 @@ function mapPrismaProduct(p) {
     badge: p.badge || null,
     rating: p.rating ? Number(p.rating) : 5.0,
     reviewCount: p.reviewCount ? Number(p.reviewCount) : 0,
+    soldCount: p.soldCount !== undefined ? Number(p.soldCount) : 0,
     stockQuantity: p.stockQuantity !== undefined ? Number(p.stockQuantity) : 100,
     heldQuantity: stockReservationService.getHeldQuantity(p.id),
     availableStock: Math.max(

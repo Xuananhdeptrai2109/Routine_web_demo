@@ -16,8 +16,7 @@ import homeStyles from "./Home.module.css";
 const genderFilters = [
   { label: "All", value: null },
   { label: "Men", value: "men" },
-  { label: "Women", value: "women" },
-  { label: "Unisex", value: "unisex" }
+  { label: "Women", value: "women" }
 ];
 
 export default function HomePage() {

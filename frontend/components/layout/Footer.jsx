@@ -61,7 +61,7 @@ function FooterColumn({ title, links }) {
           alignItems: "center",
           justifyContent: "space-between",
           padding: "16px 0",
-          fontSize: 13,
+          fontSize: 14,
           letterSpacing: "0.08em",
           fontWeight: 600
         }}
@@ -74,7 +74,7 @@ function FooterColumn({ title, links }) {
       <ul className={`footer-col-links ${open ? "is-open" : ""}`}>
         {links.map((link) => (
           <li key={link.label} style={{ padding: "8px 0" }}>
-            <Link href={link.href} style={{ fontSize: 14, color: "var(--color-text-secondary)" }}>
+            <Link href={link.href} style={{ fontSize: 15, color: "var(--color-text-secondary)" }}>
               {link.label}
             </Link>
           </li>
@@ -89,7 +89,7 @@ export default function Footer() {
     <footer style={{ background: "var(--color-bg-secondary)", marginTop: 40 }}>
       <div className="container footer-container">
         <div className="footer-header">
-          <span style={{ fontSize: 20, fontWeight: 700, letterSpacing: "0.14em" }}>ROUTINE</span>
+          <span style={{ fontSize: 21, fontWeight: 700, letterSpacing: "0.14em" }}>ROUTINE</span>
           <div className="footer-social-wrap">
             <span className="footer-social-label">Theo dõi chúng tôi tại:</span>
             <div className="footer-socials">
@@ -126,7 +126,7 @@ export default function Footer() {
             justifyContent: "space-between"
           }}
         >
-          <p style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>© 2026 Routine Smart Fashion</p>
+          <p style={{ fontSize: 14, color: "var(--color-text-secondary)" }}>© 2026 Routine Smart Fashion</p>
         </div>
       </div>
 
@@ -150,7 +150,7 @@ export default function Footer() {
           flex-wrap: wrap;
         }
         .footer-social-label {
-          font-size: 13px;
+          font-size: 14px;
           font-weight: 700;
           color: var(--color-text);
         }
@@ -161,7 +161,7 @@ export default function Footer() {
           align-items: center;
         }
         .footer-social-link {
-          font-size: 13px;
+          font-size: 14px;
           font-weight: 700;
           color: var(--color-text);
           text-decoration: none;

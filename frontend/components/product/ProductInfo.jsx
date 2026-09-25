@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useCart } from "@/context/CartContext";
 import { useToast } from "@/components/common/Toast";
 import WishlistButton from "@/components/wishlist/WishlistButton";
@@ -10,8 +10,20 @@ import { getColorById } from "@/data/colors";
 import { getSizeById } from "@/data/sizes";
 import { isProductOutOfStock as checkOutOfStock } from "@/data/products";
 
-function AccordionRow({ title, content }) {
-  const [open, setOpen] = useState(false);
+function AccordionRow({ title, content, defaultOpen = true }) {
+  const [open, setOpen] = useState(defaultOpen);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [hasOverflow, setHasOverflow] = useState(false);
+  const textRef = useRef(null);
+
+  useEffect(() => {
+    if (!textRef.current || !content) return;
+    const lineCount = (content || "").split(/\r\n|\r|\n/).length;
+    if (lineCount > 9 || textRef.current.scrollHeight > textRef.current.clientHeight + 2) {
+      setHasOverflow(true);
+    }
+  }, [content, open]);
+
   return (
     <div style={{ borderBottom: "1px solid var(--color-border)" }}>
       <button
@@ -23,8 +35,8 @@ function AccordionRow({ title, content }) {
           justifyContent: "space-between",
           alignItems: "center",
           padding: "16px 0",
-          fontWeight: 500,
-          fontSize: 14,
+          fontWeight: 600,
+          fontSize: 15,
           cursor: "pointer",
           background: "none",
           border: "none"
@@ -34,9 +46,53 @@ function AccordionRow({ title, content }) {
         <ChevronDownIcon style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 0.2s" }} />
       </button>
       {open && (
-        <p style={{ paddingBottom: 16, color: "var(--color-text-secondary)", fontSize: 14, lineHeight: 1.6 }}>
-          {content || "Thông tin đang được cập nhật."}
-        </p>
+        <div style={{ paddingBottom: 16 }}>
+          <div
+            ref={textRef}
+            style={{
+              color: "var(--color-text-secondary)",
+              fontSize: 15,
+              lineHeight: 1.6,
+              whiteSpace: "pre-line",
+              display: isExpanded ? "block" : "-webkit-box",
+              WebkitLineClamp: isExpanded ? "unset" : 9,
+              WebkitBoxOrient: "vertical",
+              overflow: isExpanded ? "visible" : "hidden"
+            }}
+          >
+            {content || "Thông tin đang được cập nhật."}
+          </div>
+          {hasOverflow && (
+            <button
+              type="button"
+              onClick={() => setIsExpanded((prev) => !prev)}
+              style={{
+                marginTop: 10,
+                background: "none",
+                border: "none",
+                color: "var(--color-primary, #111)",
+                fontWeight: 600,
+                fontSize: 14,
+                cursor: "pointer",
+                padding: "4px 0",
+                textDecoration: "underline",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6
+              }}
+            >
+              {isExpanded ? (
+                <>
+                  Thu gọn <ChevronDownIcon style={{ transform: "rotate(180deg)", width: 14, height: 14 }} />
+                </>
+              ) : (
+                <>
+                  Ẩn bớt <ChevronDownIcon style={{ width: 14, height: 14 }} />
+                </>
+              )}
+            </button>
+          )}
+        </div>
       )}
     </div>
   );
@@ -148,18 +204,24 @@ export default function ProductInfo({ product, isOutOfStock: propOutOfStock }) {
     <div>
       <h1 style={{ fontSize: 26, marginBottom: 8 }}>{product.name}</h1>
 
-      {product.rating && (
-        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 16 }}>
-          <div style={{ display: "flex", gap: 2, color: "var(--color-primary)" }}>
-            {Array.from({ length: 5 }).map((_, i) => (
-              <StarIcon key={i} filled={i < Math.round(product.rating)} />
-            ))}
-          </div>
-          <span style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>
-            {product.rating.toFixed(1)} ({product.reviewCount || 0} đánh giá)
-          </span>
-        </div>
-      )}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+        {product.rating ? (
+          <>
+            <div style={{ display: "flex", gap: 2, color: "var(--color-primary)" }}>
+              {Array.from({ length: 5 }).map((_, i) => (
+                <StarIcon key={i} filled={i < Math.round(product.rating)} />
+              ))}
+            </div>
+            <span style={{ fontSize: 14, color: "var(--color-text-secondary)" }}>
+              {product.rating.toFixed(1)} ({product.reviewCount || 0} đánh giá)
+            </span>
+            <span style={{ color: "var(--color-border)", margin: "0 2px" }}>•</span>
+          </>
+        ) : null}
+        <span style={{ fontSize: 14, color: "var(--color-text-secondary)", fontWeight: 500 }}>
+          Đã bán {product.soldCount !== undefined ? product.soldCount : 99}
+        </span>
+      </div>
 
       <div className="price" style={{ fontSize: 20, marginBottom: isOutOfStock ? 16 : 24, display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
         <span className="price-current">{formatPrice(product.price)}</span>
@@ -323,7 +385,7 @@ export default function ProductInfo({ product, isOutOfStock: propOutOfStock }) {
           style={{
             flex: 1,
             height: 48,
-            fontSize: 15,
+            fontSize: 16,
             fontWeight: 600,
             letterSpacing: "0.04em",
             background: isOutOfStock ? "var(--color-bg-secondary, #ebebeb)" : undefined,

@@ -133,10 +133,15 @@ export default function ProductCard({ product }) {
       <div className={styles.info}>
         <span className={styles.category}>{product.category}</span>
         <span className={styles.name}>{product.name}</span>
-        <div className="price" style={{ display: "flex", alignItems: "center", flexWrap: "wrap" }}>
-          <span className="price-current">{formatPrice(product.price)}</span>
-          {product.originalPrice && <span className="price-original">{formatPrice(product.originalPrice)}</span>}
-          {isOutOfStock && <span className={styles.outOfStockText}>• Hết hàng</span>}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, flexWrap: "wrap", marginTop: 2 }}>
+          <div className="price" style={{ display: "flex", alignItems: "baseline", flexWrap: "wrap", gap: 6 }}>
+            <span className="price-current">{formatPrice(product.price)}</span>
+            {product.originalPrice && <span className="price-original">{formatPrice(product.originalPrice)}</span>}
+            {isOutOfStock && <span className={styles.outOfStockText}>• Hết hàng</span>}
+          </div>
+          <span className={styles.soldCount}>
+            Đã bán {product.soldCount !== undefined ? product.soldCount : 99}
+          </span>
         </div>
         {product.colors?.length > 0 && (
           <div className={styles.colors} aria-label={`Màu sắc: ${product.colors.map((c) => (typeof c === "object" ? c.name : c)).join(", ")}`}>

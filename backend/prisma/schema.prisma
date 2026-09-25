@@ -107,6 +107,7 @@ model Product {
   sizes         Json?          // Array of sizes: ["S", "M", "L", "XL"]
   colors        Json?          // Array of color names: ["Trắng", "Đen"]
   stockQuantity Int            @default(100) @map("stock_quantity")
+  soldCount     Int            @default(0) @map("sold_count")
   isFeatured    Boolean        @default(false) @map("is_featured")
   isTrending    Boolean        @default(false) @map("is_trending")
   createdAt     DateTime       @default(now()) @map("created_at")

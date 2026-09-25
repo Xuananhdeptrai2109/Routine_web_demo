@@ -327,6 +327,20 @@ async function createOrder(identityId, orderInput) {
     throw reservationError;
   }
 
+  // Cập nhật số lượng đã bán thực tế vào cơ sở dữ liệu (đối với đơn COD đã xác nhận)
+  if (finalPayMethod !== 'VNPAY') {
+    for (const it of itemsToCreate) {
+      if (it.productId) {
+        await prisma.product
+          .update({
+            where: { id: it.productId },
+            data: { soldCount: { increment: it.quantity } },
+          })
+          .catch((e) => console.warn(`[orderService] Cập nhật soldCount thất bại cho ${it.productId}:`, e.message));
+      }
+    }
+  }
+
   // Chỉ xóa giỏ hàng nếu đơn là COD
   // Đối với VNPay, giỏ hàng được bảo toàn cho tới khi thanh toán thành công
   if (finalPayMethod !== 'VNPAY') {
@@ -476,6 +490,20 @@ async function cancelOrder(id) {
   });
 
   await stockReservationService.releaseStock(id);
+
+  // Hoàn lại số lượng đã bán nếu đơn hàng trước đó đã được tính vào soldCount
+  if (order.items && order.items.length > 0 && order.orderStatus !== 'PENDING') {
+    for (const it of order.items) {
+      if (it.productId) {
+        await prisma.product
+          .update({
+            where: { id: it.productId },
+            data: { soldCount: { decrement: it.quantity } },
+          })
+          .catch(() => {});
+      }
+    }
+  }
 
   return formatOrder(updated);
 }
