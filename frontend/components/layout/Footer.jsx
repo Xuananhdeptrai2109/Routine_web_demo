@@ -10,7 +10,6 @@ const columns = [
     links: [
       { label: "Men", href: "/category/men" },
       { label: "Women", href: "/category/women" },
-      { label: "Unisex", href: "/category/unisex" },
       { label: "New Arrivals", href: "/category/new-arrivals" }
     ]
   },
@@ -89,8 +88,24 @@ export default function Footer() {
   return (
     <footer style={{ background: "var(--color-bg-secondary)", marginTop: 40 }}>
       <div className="container footer-container">
-        <div style={{ marginBottom: 40 }}>
+        <div className="footer-header">
           <span style={{ fontSize: 20, fontWeight: 700, letterSpacing: "0.14em" }}>ROUTINE</span>
+          <div className="footer-social-wrap">
+            <span className="footer-social-label">Theo dõi chúng tôi tại:</span>
+            <div className="footer-socials">
+              {social.map((s) => (
+                <a
+                  key={s.name}
+                  href={s.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="footer-social-link"
+                >
+                  {s.name}
+                </a>
+              ))}
+            </div>
+          </div>
         </div>
 
         <div className="footer-grid">
@@ -112,19 +127,6 @@ export default function Footer() {
           }}
         >
           <p style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>© 2026 Routine Smart Fashion</p>
-          <div style={{ display: "flex", gap: 16 }}>
-            {social.map((s) => (
-              <a
-                key={s.name}
-                href={s.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ fontSize: 13, color: "var(--color-text-secondary)" }}
-              >
-                {s.name}
-              </a>
-            ))}
-          </div>
         </div>
       </div>
 
@@ -132,6 +134,43 @@ export default function Footer() {
         .footer-container {
           padding-top: 56px;
           padding-bottom: 32px;
+        }
+        .footer-header {
+          margin-bottom: 40px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          flex-wrap: wrap;
+          gap: 16px;
+        }
+        .footer-social-wrap {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+          flex-wrap: wrap;
+        }
+        .footer-social-label {
+          font-size: 13px;
+          font-weight: 700;
+          color: var(--color-text);
+        }
+        .footer-socials {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 16px;
+          align-items: center;
+        }
+        .footer-social-link {
+          font-size: 13px;
+          font-weight: 700;
+          color: var(--color-text);
+          text-decoration: none;
+          transition: opacity 0.2s ease, color 0.2s ease;
+        }
+        .footer-social-link:hover {
+          color: var(--color-primary, #000);
+          opacity: 0.75;
+          text-decoration: underline;
         }
         .footer-grid {
           display: grid;
@@ -144,6 +183,24 @@ export default function Footer() {
           .footer-container {
             padding-top: 40px;
             padding-bottom: 24px;
+          }
+          .footer-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 14px;
+            margin-bottom: 28px;
+          }
+          .footer-social-wrap {
+            flex-direction: row;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 12px;
+          }
+          .footer-socials {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 14px;
+            align-items: center;
           }
           .footer-grid {
             grid-template-columns: 1fr;
