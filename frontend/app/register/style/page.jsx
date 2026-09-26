@@ -82,6 +82,8 @@ export default function RegisterStylePage() {
         email: data.email,
         password: data.password,
         gender: data.gender || "unisex",
+        dateOfBirth: data.dateOfBirth || data.date || null,
+        date: data.dateOfBirth || data.date || null,
         selectedStyles: stylesToSave,
       };
 
@@ -100,6 +102,8 @@ export default function RegisterStylePage() {
           email: data.email,
           phoneNumber: data.phone,
           gender: data.gender || "unisex",
+          dateOfBirth: data.dateOfBirth || data.date || null,
+          date: data.dateOfBirth || data.date || null,
           stylePreference: preferredStyle,
         },
         preferredStyle,

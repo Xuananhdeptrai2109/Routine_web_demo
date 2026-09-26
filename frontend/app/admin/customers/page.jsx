@@ -233,6 +233,7 @@ export default function CustomersPage() {
                         <div style={{ fontWeight: 600 }}>{c.fullName}</div>
                         <div style={{ fontSize: 12, color: "#6b7280" }}>
                           {c.email} • {c.phoneNumber}
+                          {(c.dateOfBirth || c.date) && ` • 🎂 ${c.dateOfBirth || c.date}`}
                         </div>
                       </td>
                       <td>{renderPlatformBadge(c.source)}</td>

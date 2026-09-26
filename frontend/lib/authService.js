@@ -203,6 +203,8 @@ export async function register(userData) {
         email: userData.email,
         password: userData.password,
         gender: userData.gender || "unisex",
+        dateOfBirth: userData.dateOfBirth || userData.date || null,
+        date: userData.date || userData.dateOfBirth || null,
         stylePreference: Array.isArray(userData.selectedStyles) && userData.selectedStyles.length > 0 ? userData.selectedStyles[0] : "minimal",
         source,
       }),

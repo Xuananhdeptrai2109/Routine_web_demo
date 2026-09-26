@@ -57,6 +57,22 @@ function validateRegister(req, res, next) {
     return sendError(res, 'Mật khẩu phải có độ dài tối thiểu 6 ký tự', 400);
   }
 
+  // Validate ngày tháng năm sinh nếu có cung cấp
+  const rawDob = req.body.dateOfBirth || req.body.date || req.body.birthday || req.body.dob;
+  if (rawDob) {
+    const d = new Date(rawDob);
+    const now = new Date();
+    if (isNaN(d.getTime()) || d > now || d.getFullYear() < 1900) {
+      return sendError(res, 'Ngày tháng năm sinh không hợp lệ (không được ở tương lai và phải sau năm 1900)', 400);
+    }
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const formatted = `${yyyy}-${mm}-${dd}`;
+    req.body.dateOfBirth = formatted;
+    req.body.date = formatted;
+  }
+
   // Gán lại dữ liệu đã chuẩn hóa vào request
   req.body.fullName = fullName.trim();
   req.body.phoneNumber = normalizePhoneNumber(phoneNumber);

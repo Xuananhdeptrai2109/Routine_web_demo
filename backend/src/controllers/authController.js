@@ -6,7 +6,19 @@ const { sendSuccess, sendError } = require('../utils/response');
  */
 async function register(req, res, next) {
   try {
-    const { fullName, phoneNumber, email, password, gender, stylePreference, source, attributionSource } = req.body;
+    const {
+      fullName,
+      phoneNumber,
+      email,
+      password,
+      gender,
+      dateOfBirth,
+      date,
+      birthday,
+      stylePreference,
+      source,
+      attributionSource,
+    } = req.body;
 
     const result = await authService.registerUser({
       fullName,
@@ -14,6 +26,8 @@ async function register(req, res, next) {
       email,
       password,
       gender: gender || 'unisex',
+      dateOfBirth: dateOfBirth || date || birthday || null,
+      date: date || dateOfBirth || birthday || null,
       stylePreference,
       source: source || attributionSource || 'ORGANIC',
     });
@@ -145,8 +159,14 @@ async function updateStylePreference(req, res, next) {
  */
 async function updateProfile(req, res, next) {
   try {
-    const { fullName, avatar } = req.body;
-    const updated = await authService.updateProfile(req.user.id || req.userId, { fullName, avatar });
+    const { fullName, avatar, dateOfBirth, date, birthday, gender } = req.body;
+    const updated = await authService.updateProfile(req.user.id || req.userId, {
+      fullName,
+      avatar,
+      gender,
+      dateOfBirth: dateOfBirth || date || birthday || null,
+      date: date || dateOfBirth || birthday || null,
+    });
     return sendSuccess(res, updated, 'Cập nhật hồ sơ thành công');
   } catch (error) {
     next(error);

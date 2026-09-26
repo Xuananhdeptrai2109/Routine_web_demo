@@ -9,6 +9,8 @@ const RegistrationContext = createContext(null);
 const emptyData = {
   name: "",
   gender: "men",
+  dateOfBirth: "",
+  date: "",
   phone: "",
   email: "",
   password: "",
@@ -16,7 +18,7 @@ const emptyData = {
 };
 
 /**
- * Lưu tạm dữ liệu đăng ký (họ tên, giới tính, sđt, email, mật khẩu, phong cách đã chọn)
+ * Lưu tạm dữ liệu đăng ký (họ tên, giới tính, ngày sinh, sđt, email, mật khẩu, phong cách đã chọn)
  * xuyên suốt /register → /register/style.
  *
  * Dùng React Context + sessionStorage: dữ liệu chỉ tồn tại trong phiên
@@ -51,8 +53,18 @@ export function RegistrationProvider({ children }) {
   }, []);
 
   const saveAccountInfo = useCallback(
-    ({ name, gender, phone, email, password }) => {
-      persist({ ...data, name, gender: gender || "men", phone, email, password });
+    ({ name, gender, dateOfBirth, date, phone, email, password }) => {
+      const dob = dateOfBirth || date || "";
+      persist({
+        ...data,
+        name,
+        gender: gender || "men",
+        dateOfBirth: dob,
+        date: dob,
+        phone,
+        email,
+        password,
+      });
     },
     [data, persist]
   );

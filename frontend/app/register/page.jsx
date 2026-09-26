@@ -18,12 +18,14 @@ import {
   validateConfirmPassword,
   validatePassword,
   validatePhone,
+  validateDateOfBirth,
 } from "@/lib/validation";
 import styles from "./page.module.css";
 
 const initialForm = {
   name: "",
   gender: "men",
+  dateOfBirth: "",
   phone: "",
   email: "",
   password: "",
@@ -49,6 +51,7 @@ export default function RegisterPage() {
   }
 
   const nameError = form.name.trim() ? "" : "Vui lòng nhập họ và tên.";
+  const dobCheck = validateDateOfBirth(form.dateOfBirth, false);
   const phoneCheck = validatePhone(form.phone);
   const emailCheck = validateEmail(form.email);
   const passwordCheck = validatePassword(form.password);
@@ -57,6 +60,7 @@ export default function RegisterPage() {
 
   const isFormValid =
     !nameError &&
+    dobCheck.valid &&
     phoneCheck.valid &&
     emailCheck.valid &&
     passwordCheck.valid &&
@@ -67,6 +71,8 @@ export default function RegisterPage() {
     e.preventDefault();
     setTouched({
       name: true,
+      gender: true,
+      dateOfBirth: true,
       phone: true,
       email: true,
       password: true,
@@ -105,6 +111,8 @@ export default function RegisterPage() {
     saveAccountInfo({
       name: form.name.trim(),
       gender: form.gender || "men",
+      dateOfBirth: form.dateOfBirth,
+      date: form.dateOfBirth,
       phone: form.phone,
       email: form.email.trim(),
       password: form.password,
@@ -162,6 +170,29 @@ export default function RegisterPage() {
               <span className={styles.genderIcon}>✦</span> Khác
             </button>
           </div>
+        </div>
+
+        <div className={styles.dobGroup}>
+          <label className={styles.dobLabel} htmlFor="register-dob">
+            Ngày tháng năm sinh <span className={styles.dobSubLabel}>(để Routine gửi ưu đãi sinh nhật đặc biệt 🎂)</span>
+          </label>
+          <div className={styles.dobInputWrap}>
+            <input
+              id="register-dob"
+              type="date"
+              name="dateOfBirth"
+              className={styles.dobInput}
+              value={form.dateOfBirth}
+              max={new Date().toISOString().split("T")[0]}
+              min="1920-01-01"
+              onChange={(e) => updateField("dateOfBirth", e.target.value)}
+              onBlur={() => markTouched("dateOfBirth")}
+              aria-invalid={Boolean(touched.dateOfBirth && !dobCheck.valid)}
+            />
+          </div>
+          {touched.dateOfBirth && !dobCheck.valid && (
+            <p className={styles.dobError}>{dobCheck.message}</p>
+          )}
         </div>
 
         <PhoneField

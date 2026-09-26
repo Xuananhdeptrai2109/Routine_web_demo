@@ -28,6 +28,33 @@ export function validateEmail(value) {
   return { valid: true, message: "" };
 }
 
+export function validateDateOfBirth(value, required = false) {
+  const dateStr = (value || "").trim();
+
+  if (!dateStr) {
+    if (required) {
+      return { valid: false, message: "Vui lòng chọn ngày tháng năm sinh." };
+    }
+    return { valid: true, message: "" };
+  }
+
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) {
+    return { valid: false, message: "Ngày sinh không hợp lệ." };
+  }
+
+  const today = new Date();
+  if (date > today) {
+    return { valid: false, message: "Ngày sinh không được ở tương lai." };
+  }
+
+  if (date.getFullYear() < 1920) {
+    return { valid: false, message: "Vui lòng chọn năm sinh hợp lệ (sau năm 1920)." };
+  }
+
+  return { valid: true, message: "" };
+}
+
 /**
  * Trả thêm `checklist` để các màn hình (Đăng ký, Đặt lại mật khẩu) render
  * danh sách yêu cầu mật khẩu theo thời gian thực.

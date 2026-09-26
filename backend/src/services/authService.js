@@ -28,20 +28,43 @@ function generateToken(user) {
 }
 
 /**
- * Loại bỏ passwordHash trước khi trả về client
+ * Loại bỏ passwordHash trước khi trả về client và chuẩn hóa ngày sinh
  */
 function sanitizeUser(user) {
   const { passwordHash, ...safeUser } = user;
+  const rawDob = safeUser.dateOfBirth || safeUser.date;
+  let formattedDob = null;
+  if (rawDob) {
+    if (rawDob instanceof Date) {
+      formattedDob = rawDob.toISOString().split('T')[0];
+    } else {
+      formattedDob = String(rawDob).split('T')[0];
+    }
+  }
+
   return {
     ...safeUser,
     name: safeUser.fullName || safeUser.name,
+    dateOfBirth: formattedDob,
+    date: formattedDob,
+    birthday: formattedDob,
   };
 }
 
 /**
  * Dịch vụ Đăng ký tài khoản
  */
-async function registerUser({ fullName, phoneNumber, email, password, gender = 'unisex', stylePreference = 'minimal', source = 'ORGANIC' }) {
+async function registerUser({
+  fullName,
+  phoneNumber,
+  email,
+  password,
+  gender = 'unisex',
+  dateOfBirth = null,
+  date = null,
+  stylePreference = 'minimal',
+  source = 'ORGANIC',
+}) {
   let existingPhone = null;
   let existingEmail = null;
 
@@ -74,6 +97,16 @@ async function registerUser({ fullName, phoneNumber, email, password, gender = '
   const normSource = String(source || 'ORGANIC').toUpperCase();
   const normGender = String(gender || 'unisex').toLowerCase().trim();
 
+  // Chuẩn hóa ngày sinh thành Date object hợp lệ cho Prisma (hoặc null)
+  const dobVal = dateOfBirth || date;
+  let parsedDob = null;
+  if (dobVal) {
+    const d = new Date(dobVal);
+    if (!isNaN(d.getTime())) {
+      parsedDob = d;
+    }
+  }
+
   let newUser = null;
   try {
     newUser = await prisma.user.create({
@@ -83,6 +116,8 @@ async function registerUser({ fullName, phoneNumber, email, password, gender = '
         email,
         passwordHash,
         gender: normGender,
+        dateOfBirth: parsedDob,
+        date: parsedDob,
         stylePreference,
         source: normSource,
       },
@@ -98,6 +133,8 @@ async function registerUser({ fullName, phoneNumber, email, password, gender = '
       passwordHash,
       role: 'CUSTOMER',
       gender: normGender,
+      dateOfBirth: parsedDob,
+      date: parsedDob,
       stylePreference,
       source: normSource,
       createdAt: new Date().toISOString(),
@@ -545,10 +582,18 @@ async function updateStylePreference(userId, stylePreference) {
 /**
  * Cập nhật thông tin hồ sơ
  */
-async function updateProfile(userId, { fullName, avatar }) {
+async function updateProfile(userId, { fullName, avatar, dateOfBirth, date, gender }) {
   const updateData = {};
   if (fullName) updateData.fullName = fullName;
   if (avatar) updateData.avatar = avatar;
+  if (gender) updateData.gender = gender;
+  if (dateOfBirth || date) {
+    const parsed = new Date(dateOfBirth || date);
+    if (!isNaN(parsed.getTime())) {
+      updateData.dateOfBirth = parsed;
+      updateData.date = parsed;
+    }
+  }
 
   try {
     const updated = await prisma.user.update({
