@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { slugify } from "@/data/products";
 import { getCategories } from "@/lib/categoryService";
 import { getStyles } from "@/lib/styleService";
-import { colors as allColors, getColorById } from "@/data/colors";
+import { colors as allColors, getColorById, registerColor, toColorSlug } from "@/data/colors";
 import { sizes as allSizes, getSizeById } from "@/data/sizes";
 import { suggestSkuPrefix, buildVariantSku } from "@/lib/sku";
 import { isSkuTaken } from "@/lib/adminProductService";
@@ -108,6 +108,15 @@ function productToForm(product) {
       if (!sku || seenSkus.has(sku.toLowerCase()) || sku.includes("-CO-")) {
         sku = buildVariantSku(prefix, i + 1, cId, sId);
       }
+      if (seenSkus.has(sku.toLowerCase())) {
+        let counter = 1;
+        let candidate = `${sku}-${counter}`;
+        while (seenSkus.has(candidate.toLowerCase())) {
+          counter += 1;
+          candidate = `${sku}-${counter}`;
+        }
+        sku = candidate;
+      }
       seenSkus.add(sku.toLowerCase());
 
       return {
@@ -135,7 +144,11 @@ function productToForm(product) {
       new Set(
         pColors.map((cName) => {
           const found = getColorById(cName);
-          return found ? found.id : allColors[0]?.id || "color-white";
+          if (found) return found.id;
+          const slug = toColorSlug(cName);
+          const customId = `color-${slug || "custom"}`;
+          registerColor({ id: customId, name: cName, hexCode: "#666666" });
+          return customId;
         })
       )
     );
@@ -155,19 +168,33 @@ function productToForm(product) {
     let rem = prodStock % totalCombos;
 
     let seq = 1;
+    const seenSkus = new Set();
     for (const cId of matchedColorIds) {
       for (const sId of matchedSizeIds) {
         const cObj = getColorById(cId);
         const sObj = getSizeById(sId);
         const vStock = baseStock + (rem > 0 ? 1 : 0);
         if (rem > 0) rem -= 1;
+        const freshSku = buildVariantSku(prefix, seq, cObj?.id || cId, sObj?.id || sId);
+        let finalSku = freshSku;
+        if (seenSkus.has(finalSku.toLowerCase())) {
+          let counter = 1;
+          let candidate = `${finalSku}-${counter}`;
+          while (seenSkus.has(candidate.toLowerCase())) {
+            counter += 1;
+            candidate = `${finalSku}-${counter}`;
+          }
+          finalSku = candidate;
+        }
+        seenSkus.add(finalSku.toLowerCase());
+
         variants.push({
           id: `v-${product.id || "p"}-${seq}`,
-          colorId: cId,
+          colorId: cObj?.id || cId,
           colorName: cObj ? cObj.name : (cId ? String(cId).replace(/^color-/, "") : "Default"),
-          sizeId: sId,
+          sizeId: sObj?.id || sId,
           sizeName: sObj ? sObj.name : (sId ? String(sId).replace(/^size-/, "").toUpperCase() : "Default"),
-          sku: buildVariantSku(prefix, seq, cId, sId),
+          sku: finalSku,
           price: Number(product.price) || 0,
           stockQuantity: vStock,
           status: "ACTIVE",

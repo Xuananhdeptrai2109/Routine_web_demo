@@ -36,28 +36,49 @@ export default function VariantEditor({
 
     for (const colorId of activeColorIds) {
       for (const sizeId of activeSizeIds) {
-        // Tìm biến thể tương ứng nếu đã tồn tại
-        const existing = (currentVariants || []).find(
-          (v) =>
-            (v.colorId === colorId || (colorId && v.colorId && String(colorId).toLowerCase() === String(v.colorId).toLowerCase())) &&
-            (v.sizeId === sizeId || (sizeId && v.sizeId && String(sizeId).toLowerCase() === String(v.sizeId).toLowerCase()))
-        );
+        const cObj = getColorById(colorId);
+        const sObj = getSizeById(sizeId);
+        const cCanonicalId = cObj?.id || colorId;
+        const sCanonicalId = sObj?.id || sizeId;
 
-        const freshSku = buildVariantSku(skuPrefix, sequence, colorId, sizeId);
+        // Tìm biến thể tương ứng nếu đã tồn tại
+        const existing = (currentVariants || []).find((v) => {
+          const matchColor =
+            !colorId ||
+            v.colorId === colorId ||
+            v.colorId === cCanonicalId ||
+            (v.colorName && cObj && v.colorName.toLowerCase() === cObj.name.toLowerCase());
+          const matchSize =
+            !sizeId ||
+            v.sizeId === sizeId ||
+            v.sizeId === sCanonicalId ||
+            (v.sizeName && sObj && v.sizeName.toUpperCase() === sObj.name.toUpperCase());
+          return matchColor && matchSize;
+        });
+
+        const freshSku = buildVariantSku(skuPrefix, sequence, cCanonicalId, sCanonicalId);
         let finalSku = freshSku;
         if (existing && existing.sku && !seenSkus.has(existing.sku.toLowerCase()) && !existing.sku.includes("-CO-")) {
           finalSku = existing.sku;
         }
-        seenSkus.add(finalSku.toLowerCase());
 
-        const cObj = getColorById(colorId);
-        const sObj = getSizeById(sizeId);
+        // Đảm bảo không trùng lặp SKU giữa các biến thể
+        if (seenSkus.has(finalSku.toLowerCase())) {
+          let counter = 1;
+          let candidate = `${finalSku}-${counter}`;
+          while (seenSkus.has(candidate.toLowerCase())) {
+            counter += 1;
+            candidate = `${finalSku}-${counter}`;
+          }
+          finalSku = candidate;
+        }
+        seenSkus.add(finalSku.toLowerCase());
 
         next.push({
           id: existing ? existing.id : generateLocalId(),
-          colorId,
+          colorId: cCanonicalId,
           colorName: cObj ? cObj.name : (existing?.colorName || (colorId ? String(colorId).replace(/^color-/, "") : "Default")),
-          sizeId,
+          sizeId: sCanonicalId,
           sizeName: sObj ? sObj.name : (existing?.sizeName || (sizeId ? String(sizeId).replace(/^size-/, "").toUpperCase() : "Default")),
           sku: finalSku,
           price: existing && existing.price !== undefined ? existing.price : (basePrice || 0),
@@ -96,11 +117,20 @@ export default function VariantEditor({
     onChangeVariants(next);
   }
 
+  // Tổng hợp danh sách màu đầy đủ (bao gồm cả các màu tùy chỉnh hiện có trên sản phẩm)
+  const mergedColorOptions = [
+    ...allColors,
+    ...selectedColorIds
+      .map(getColorById)
+      .filter(Boolean)
+      .filter((c) => !allColors.some((ac) => ac.id === c.id)),
+  ];
+
   return (
     <div className={styles.wrap}>
       <div className={styles.pickRow}>
         <ColorSelector
-          colorOptions={allColors}
+          colorOptions={mergedColorOptions}
           value={selectedColorIds}
           onChange={handleColorsChange}
         />
