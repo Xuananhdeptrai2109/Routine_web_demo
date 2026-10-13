@@ -33,9 +33,21 @@ const CATEGORY_SYNONYMS = {
   'ao-polo': [
     'áo polo', 'ao polo', 'polo', 'áo có cổ', 'ao co co', 'cổ bẻ'
   ],
+  'ao-len': [
+    'áo len', 'ao len', 'len', 'cardigan', 'dệt kim', 'det kim', 'sweater', 'áo sweater',
+    'cổ lọ', 'co lo', 'vặn thừng', 'gile len', 'áo gile'
+  ],
+  'ao-ni': [
+    'áo nỉ', 'ao ni', 'nỉ', 'hoodie', 'áo hoodie', 'sweatshirt', 'áo nỉ chui đầu', 'nỉ bông'
+  ],
+  'cat-blazer': [
+    'blazer', 'áo blazer', 'ao blazer', 'áo vest', 'ao vest', 'vest', 'suit',
+    'blazer nam', 'blazer nữ'
+  ],
   'ao-khoac': [
-    'áo khoác', 'ao khoac', 'jacket', 'blazer', 'cardigan', 'bomber', 'áo gió',
-    'ao gio', 'khoác nhẹ', 'vest', 'áo vest'
+    'áo khoác', 'ao khoac', 'jacket', 'bomber', 'áo gió', 'ao gio', 'khoác nhẹ',
+    'áo khoác dạ', 'măng tô', 'mang to', 'trench coat', 'áo phao', 'ao phao',
+    'outerwear', 'áo khoác ấm', 'áo dạ'
   ],
   'quan-jeans': [
     'quần bò', 'quan bo', 'quần jean', 'quan jean', 'quần jeans', 'quan jeans',
@@ -50,6 +62,23 @@ const CATEGORY_SYNONYMS = {
   ],
   'quan-kaki': [
     'quần kaki', 'quan kaki', 'kaki', 'khaki', 'chinos', 'quần chinos'
+  ],
+  'vay': [
+    'chân váy', 'chan vay', 'váy', 'vay', 'đầm', 'dam', 'midi', 'skirt',
+    'chân váy xòe', 'chân váy xếp ly'
+  ],
+};
+
+const SEASON_SYNONYMS = {
+  'autumn-winter': [
+    'thu đông', 'thu dong', 'mùa đông', 'mua dong', 'mùa thu', 'mua thu',
+    'trời lạnh', 'troi lanh', 'se lạnh', 'se lanh', 'gió mùa', 'gio mua',
+    'giữ ấm', 'giu am', 'ấm áp', 'am ap', 'lạnh', 'lanh', 'mùa rét', 'ret',
+    'layer', 'phối layer', 'mặc ấm'
+  ],
+  'spring-summer': [
+    'xuân hè', 'xuan he', 'mùa hè', 'mua he', 'nắng nóng', 'nang nong',
+    'mát mẻ', 'mat me', 'thoáng mát', 'thoang mat', 'mùa nóng'
   ],
 };
 
@@ -149,7 +178,15 @@ function normalizeFashionQuery(text) {
     }
   }
 
-  // 6. Phân tích Ngân sách bằng Regex
+  // 6. Phân tích Mùa (Season)
+  for (const [canonical, list] of Object.entries(SEASON_SYNONYMS)) {
+    if (list.some((kw) => lower.includes(kw))) {
+      result.season = canonical;
+      break;
+    }
+  }
+
+  // 7. Phân tích Ngân sách bằng Regex
   // VD: "dưới 500k", "tầm 1 triệu", "< 1tr", "tối đa 800.000"
   const budgetMatch = lower.match(/(?:dưới|tam|tầm|khoảng|khoang|dưới|tối đa|toi da|<|duoi)\s*(\d+(?:[.,]\d+)?)\s*(k|tr|triệu|trieu|nghìn|nghin|đ|d)?/);
   if (budgetMatch) {
@@ -270,6 +307,7 @@ function extractHeightAndWeight(text) {
 module.exports = {
   FIT_SYNONYMS,
   CATEGORY_SYNONYMS,
+  SEASON_SYNONYMS,
   COLOR_SYNONYMS,
   OCCASION_SYNONYMS,
   GENDER_SYNONYMS,

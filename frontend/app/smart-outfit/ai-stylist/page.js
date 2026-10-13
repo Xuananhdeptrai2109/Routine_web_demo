@@ -4,7 +4,10 @@ export const metadata = {
   title: "AI Stylist — Routine Thu Đông"
 };
 
-export default function AIStylistPage() {
+export default function AIStylistPage({ searchParams }) {
+  const currentProductId = searchParams?.productId || null;
+  const initialPrompt = searchParams?.prompt || (currentProductId ? "Gợi ý cho mình set đồ phối ăn ý nhất với sản phẩm này" : "");
+
   return (
     <div className="container section">
       <div className="section-header" style={{ marginBottom: 40 }}>
@@ -13,7 +16,10 @@ export default function AIStylistPage() {
           AI STYLIST
         </h1>
       </div>
-      <AIStylistChat />
+      <AIStylistChat
+        currentProductId={currentProductId}
+        initialPrompt={initialPrompt}
+      />
     </div>
   );
 }

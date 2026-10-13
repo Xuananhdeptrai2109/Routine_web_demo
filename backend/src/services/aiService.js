@@ -9,12 +9,12 @@ const sizeGuideService = require('./sizeGuideService');
 const { normalizeFashionQuery } = require('../utils/fashionThesaurus');
 
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
-const GEMINI_MODELS = ['gemini-flash-lite-latest', 'gemini-flash-latest'];
+const GEMINI_MODELS = ['gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
 
 /**
  * Gọi Google Gemini REST API hỗ trợ chat đa lượt & generation config
  */
-async function callGeminiApi({ contents, systemInstruction, model = 'gemini-flash-lite-latest', temperature = 0.7, responseMimeType = null }) {
+async function callGeminiApi({ contents, systemInstruction, model = 'gemini-3.5-flash', temperature = 0.7, responseMimeType = null }) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     return null;
@@ -44,7 +44,7 @@ async function callGeminiApi({ contents, systemInstruction, model = 'gemini-flas
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
-        signal: AbortSignal.timeout(4000),
+        signal: AbortSignal.timeout(9000),
       });
 
       if (!response.ok) {
@@ -57,8 +57,9 @@ async function callGeminiApi({ contents, systemInstruction, model = 'gemini-flas
       }
 
       const data = await response.json();
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (text) return text;
+      const parts = data.candidates?.[0]?.content?.parts || [];
+      const textPart = parts.find((p) => typeof p.text === 'string' && p.text.length > 0);
+      if (textPart && textPart.text) return textPart.text;
     } catch (err) {
       console.warn(`[aiService] Gemini API (${targetModel}) tạm thời gián đoạn (${err.message}) -> chuyển sang phân tích thông minh cục bộ.`);
       break;
@@ -266,34 +267,43 @@ function isTop(p) {
   if (!p) return false;
   const slug = (p.categorySlug || p.categoryId || '').toLowerCase();
   const name = (p.name || '').toLowerCase();
-  return slug === 'tops' || slug.includes('top') || slug.includes('ao') || slug.includes('shirt') ||
+  return slug === 'tops' || slug === 'ao' || slug === 'ao-len' || slug === 'ao-ni' || slug === 'ao-sweater' ||
+    slug.includes('top') || slug.includes('shirt') ||
     name.includes('shirt') || name.includes('tee') || name.includes('polo') || name.includes('hoodie') ||
-    name.includes('blouse') || name.includes('tank') || name.includes('áo');
+    name.includes('blouse') || name.includes('tank') || name.includes('áo') || name.includes('len') ||
+    name.includes('sweater') || name.includes('dệt kim') || name.includes('nỉ');
 }
 
 function isBottom(p) {
   if (!p) return false;
   const slug = (p.categorySlug || p.categoryId || '').toLowerCase();
   const name = (p.name || '').toLowerCase();
-  return slug === 'bottoms' || slug.includes('bottom') || slug.includes('quan') || slug.includes('pant') ||
+  return slug === 'bottoms' || slug === 'quan' || slug === 'quan-kaki' || slug === 'quan-tay' ||
+    slug === 'quan-vai' || slug === 'quan-jean' || slug === 'cat-jeans' || slug === 'cat-trousers' ||
+    slug === 'cat-shorts' || slug === 'vay' || slug.includes('bottom') || slug.includes('quan') ||
     name.includes('pant') || name.includes('jean') || name.includes('trouser') || name.includes('skirt') ||
-    name.includes('quần') || name.includes('short');
+    name.includes('quần') || name.includes('short') || name.includes('kaki') || name.includes('váy') ||
+    name.includes('đầm');
 }
 
 function isOuterwear(p) {
   if (!p) return false;
   const slug = (p.categorySlug || p.categoryId || '').toLowerCase();
   const name = (p.name || '').toLowerCase();
-  return slug === 'outerwear' || slug.includes('khoac') || name.includes('jacket') || name.includes('blazer') ||
-    name.includes('cardigan') || name.includes('coat') || name.includes('windbreaker') || name.includes('khoác');
+  return slug === 'outerwear' || slug === 'ao-khoac' || slug === 'cat-blazer' || slug === 'cat-jacket' ||
+    slug === 'ao-vest' || slug.includes('khoac') || slug.includes('blazer') ||
+    name.includes('jacket') || name.includes('blazer') || name.includes('cardigan') || name.includes('coat') ||
+    name.includes('windbreaker') || name.includes('khoác') || name.includes('măng tô') || name.includes('vest') ||
+    name.includes('bomber') || name.includes('dạ') || name.includes('phao');
 }
 
 function isAccessory(p) {
   if (!p) return false;
   const slug = (p.categorySlug || p.categoryId || '').toLowerCase();
   const name = (p.name || '').toLowerCase();
-  return slug === 'phu-kien' || slug.includes('phu-kien') || name.includes('sneakers') || name.includes('belt') ||
-    name.includes('bag') || name.includes('hat');
+  return slug === 'phu-kien' || slug === 'non-bang-do' || slug.includes('phu-kien') ||
+    name.includes('sneakers') || name.includes('belt') || name.includes('bag') || name.includes('hat') ||
+    name.includes('nón') || name.includes('mũ') || name.includes('giày');
 }
 
 /**
@@ -569,6 +579,8 @@ async function assembleDynamicOutfit(intent, currentProduct = null, userMessage 
     if ((qLower.includes('sơ mi') || qLower.includes('somi') || intent.category === 'ao-somi') && name.includes('shirt')) sc += 25;
     if ((qLower.includes('blouse') || intent.category === 'ao-blouse') && name.includes('blouse')) sc += 25;
     if (qLower.includes('hoodie') && name.includes('hoodie')) sc += 25;
+    if ((qLower.includes('len') || intent.category === 'ao-len' || qLower.includes('sweater') || qLower.includes('dệt kim')) && (name.includes('len') || name.includes('sweater') || name.includes('dệt kim') || name.includes('cardigan'))) sc += 40;
+    if ((qLower.includes('nỉ') || intent.category === 'ao-ni') && (name.includes('nỉ') || name.includes('hoodie') || name.includes('sweatshirt'))) sc += 40;
 
     if (targetFit === 'oversize' || qLower.includes('lớn') || qLower.includes('rộng') || qLower.includes('bự')) {
       if (name.includes('oversized') || name.includes('relaxed') || desc.includes('oversize') || desc.includes('rộng')) sc += 20;
@@ -576,8 +588,8 @@ async function assembleDynamicOutfit(intent, currentProduct = null, userMessage 
       if (name.includes('slim') || desc.includes('ôm')) sc += 20;
     }
 
-    if (intent.occasion === 'office' && (name.includes('shirt') || name.includes('polo'))) sc += 12;
-    if (intent.occasion === 'weekend' && (name.includes('tee') || name.includes('hoodie') || name.includes('polo'))) sc += 8;
+    if (intent.occasion === 'office' && (name.includes('shirt') || name.includes('polo') || name.includes('len'))) sc += 12;
+    if (intent.occasion === 'weekend' && (name.includes('tee') || name.includes('hoodie') || name.includes('polo') || name.includes('sweater'))) sc += 8;
 
     if (targetColor) {
       const colorsStr = JSON.stringify(p.colors || []).toLowerCase();
@@ -611,13 +623,14 @@ async function assembleDynamicOutfit(intent, currentProduct = null, userMessage 
       else return -100;
     }
 
-    if ((qLower.includes('quần tây') || qLower.includes('quần âu') || qLower.includes('tây') || qLower.includes('âu') || intent.category === 'quan-tay') && name.includes('trouser')) sc += 35;
+    if ((qLower.includes('quần tây') || qLower.includes('quần âu') || qLower.includes('tây') || qLower.includes('âu') || intent.category === 'quan-tay') && (name.includes('trouser') || name.includes('tây') || name.includes('âu') || name.includes('vải'))) sc += 35;
     if ((qLower.includes('jean') || qLower.includes('quần bò') || qLower.includes('bò') || intent.category === 'quan-jeans') && name.includes('jeans')) sc += 35;
+    if ((qLower.includes('kaki') || intent.category === 'quan-kaki') && (name.includes('kaki') || name.includes('khaki') || name.includes('chinos'))) sc += 35;
     if (qLower.includes('cargo') && name.includes('cargo')) sc += 35;
-    if ((qLower.includes('chân váy') || qLower.includes('skirt')) && name.includes('skirt')) sc += 35;
+    if ((qLower.includes('chân váy') || qLower.includes('skirt') || intent.category === 'vay') && (name.includes('skirt') || name.includes('váy') || name.includes('đầm'))) sc += 35;
 
-    if (intent.occasion === 'office' && name.includes('trouser')) sc += 15;
-    if (intent.occasion === 'weekend' && (name.includes('jeans') || name.includes('cargo'))) sc += 12;
+    if (intent.occasion === 'office' && (name.includes('trouser') || name.includes('kaki'))) sc += 15;
+    if (intent.occasion === 'weekend' && (name.includes('jeans') || name.includes('cargo') || name.includes('kaki'))) sc += 12;
 
     // Yêu cầu đổi màu sáng hoặc màu tối
     if (qLower.includes('sáng') || targetColor === 'trắng' || targetColor === 'be') {
@@ -639,6 +652,34 @@ async function assembleDynamicOutfit(intent, currentProduct = null, userMessage 
     return sc;
   }
 
+  // Hàm chấm điểm sản phẩm Outerwear (Áo khoác / Blazer / Cardigan)
+  function scoreOuterwear(p) {
+    let sc = 0;
+    const name = (p.name || '').toLowerCase();
+    const pGender = p.gender || 'unisex';
+
+    if (excludes.some((ex) => name.includes(ex) || ex.includes(name))) return -1000;
+    if (gender !== 'unisex') {
+      if (pGender === gender) sc += 10;
+      else if (pGender === 'unisex') sc += 5;
+      else return -100;
+    }
+
+    if ((qLower.includes('blazer') || intent.category === 'cat-blazer') && name.includes('blazer')) sc += 40;
+    if ((qLower.includes('vest') || intent.category === 'ao-vest') && (name.includes('vest') || name.includes('blazer'))) sc += 40;
+    if (qLower.includes('măng tô') && (name.includes('măng tô') || name.includes('coat'))) sc += 40;
+    if (qLower.includes('bomber') && name.includes('bomber')) sc += 40;
+    if (qLower.includes('khoác dạ') && (name.includes('dạ') || name.includes('coat'))) sc += 40;
+    if (qLower.includes('cardigan') && name.includes('cardigan')) sc += 40;
+
+    if (targetColor) {
+      const colorsStr = JSON.stringify(p.colors || []).toLowerCase();
+      if (colorsStr.includes(targetColor) || name.includes(targetColor)) sc += 15;
+    }
+    if (p.isFeatured) sc += 5;
+    return sc;
+  }
+
   if (!chosenTop && tops.length > 0) {
     const scoredTops = tops
       .map((p) => ({ product: p, score: scoreTop(p) }))
@@ -653,8 +694,18 @@ async function assembleDynamicOutfit(intent, currentProduct = null, userMessage 
     chosenBottom = scoredBottoms[0]?.product || bottoms[0];
   }
 
+  // Ưu tiên bổ sung Outerwear (Áo khoác / Blazer) cho mùa Thu Đông hoặc khi khách yêu cầu
+  const wantsOuterwear = intent.season === 'autumn-winter' || intent.category === 'ao-khoac' || intent.category === 'cat-blazer' ||
+    qLower.includes('thu đông') || qLower.includes('lạnh') || qLower.includes('khoác') || qLower.includes('blazer') || qLower.includes('vest') || qLower.includes('ấm');
+  if (!chosenOuterwear && outerwears.length > 0 && wantsOuterwear) {
+    const scoredOuterwears = outerwears
+      .map((p) => ({ product: p, score: scoreOuterwear(p) }))
+      .sort((a, b) => b.score - a.score);
+    chosenOuterwear = scoredOuterwears[0]?.product || outerwears[0];
+  }
+
   // Tùy chọn thêm phụ kiện (Giày / Thắt lưng / Mũ) nếu ngân sách thoải mái
-  const currentTotal = (Number(chosenTop?.price) || 0) + (Number(chosenBottom?.price) || 0);
+  const currentTotal = (Number(chosenTop?.price) || 0) + (Number(chosenBottom?.price) || 0) + (Number(chosenOuterwear?.price) || 0);
   if (budget >= currentTotal + 300000 && accessories.length > 0) {
     if (intent.occasion === 'office') {
       chosenAccessory = accessories.find((a) => a.name.toLowerCase().includes('belt') || a.name.toLowerCase().includes('canvas sneakers')) || null;
@@ -687,11 +738,89 @@ async function assembleDynamicOutfit(intent, currentProduct = null, userMessage 
 }
 
 /**
- * Trò chuyện với Trợ lý Thời trang AI Stylist (Multi-turn Chat)
+ * Phân tích ảnh trang phục bằng Gemini Vision API
  */
-async function chatWithStylist({ message, history = [], currentProductId = null, userPreferences = null }) {
-  // 1. Phân tích intent và chuẩn hóa từ vựng tiếng Việt với ngữ cảnh đa lượt
-  const intent = await extractFashionIntent(message, history);
+async function analyzeImageWithGemini(imageBase64) {
+  if (!imageBase64 || !process.env.GEMINI_API_KEY) return null;
+
+  let mimeType = 'image/jpeg';
+  let base64Data = imageBase64;
+  if (imageBase64.includes(';base64,')) {
+    const parts = imageBase64.split(';base64,');
+    mimeType = parts[0].replace('data:', '') || 'image/jpeg';
+    base64Data = parts[1];
+  }
+
+  const prompt = `Bạn là Trợ lý phân tích thị giác thời trang (Visual Fashion AI Stylist) của thương hiệu Routine.
+Hãy quan sát kỹ bức ảnh trang phục và trích xuất các đặc điểm thời trang sang JSON duy nhất (không viết markdown):
+{
+  "category": "ao-len" | "ao-khoac" | "cat-blazer" | "ao-thun" | "ao-somi" | "ao-polo" | "ao-ni" | "quan-jeans" | "quan-tay" | "quan-kaki" | "vay" | null,
+  "color": "đen" | "trắng" | "xám" | "be" | "nâu" | "xanh navy" | "xanh dương" | "rêu" | null,
+  "fit": "oversize" | "slim-fit" | "regular" | null,
+  "season": "autumn-winter" | "spring-summer" | null,
+  "occasion": "office" | "weekend" | "date" | "party" | null,
+  "style": "minimal" | "smart-casual" | "streetstyle" | null,
+  "gender": "men" | "women" | "unisex" | null,
+  "description": "Mô tả ngắn gọn 1 câu về trang phục trong ảnh"
+}`;
+
+  const contents = [
+    {
+      parts: [
+        { text: prompt },
+        {
+          inlineData: {
+            mimeType,
+            data: base64Data,
+          },
+        },
+      ],
+    },
+  ];
+
+  try {
+    const aiText = await callGeminiApi({
+      contents,
+      model: 'gemini-3.5-flash',
+      temperature: 0.2,
+      responseMimeType: 'application/json',
+    });
+
+    if (aiText) {
+      return safeJsonParse(aiText);
+    }
+  } catch (err) {
+    console.warn('[aiService] Lỗi phân tích ảnh với Gemini Vision:', err.message);
+  }
+  return null;
+}
+
+/**
+ * Trò chuyện với Trợ lý Thời trang AI Stylist (Multi-turn Chat & Visual Stylist)
+ */
+async function chatWithStylist({ message, history = [], currentProductId = null, userPreferences = null, image = null }) {
+  // 1. Nếu có hình ảnh gửi kèm, dùng Gemini Vision để phân tích
+  let imageAnalysis = null;
+  if (image) {
+    imageAnalysis = await analyzeImageWithGemini(image);
+  }
+
+  const effectiveMessage = (message && message.trim()) || (imageAnalysis ? `Tìm trang phục tương tự phong cách ${imageAnalysis.description || 'trong ảnh'}` : '');
+
+  // Phân tích intent và chuẩn hóa từ vựng tiếng Việt với ngữ cảnh đa lượt
+  const intent = await extractFashionIntent(effectiveMessage, history);
+
+  if (imageAnalysis) {
+    if (imageAnalysis.category) intent.category = imageAnalysis.category;
+    if (imageAnalysis.color) intent.color = imageAnalysis.color;
+    if (imageAnalysis.fit) intent.fit = imageAnalysis.fit;
+    if (imageAnalysis.season) intent.season = imageAnalysis.season;
+    if (imageAnalysis.occasion) intent.occasion = imageAnalysis.occasion;
+    if (imageAnalysis.style) intent.style = imageAnalysis.style;
+    if (imageAnalysis.gender && !intent.gender) intent.gender = imageAnalysis.gender;
+    intent.isAskingForOutfit = true;
+    intent.imageDescription = imageAnalysis.description;
+  }
 
   const mLower = (message || '').toLowerCase();
   const hasExplicitGenderInMessage =

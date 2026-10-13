@@ -3,6 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useCart } from "@/context/CartContext";
+import { useWishlist } from "@/context/WishlistContext";
+import { useUser } from "@/context/UserContext";
 import { useToast } from "@/components/common/Toast";
 import { formatPrice } from "@/lib/format";
 import { isProductOutOfStock } from "@/data/products";
@@ -10,6 +12,8 @@ import styles from "./InteractiveOutfitCard.module.css";
 
 export default function InteractiveOutfitCard({ outfit }) {
   const { addToCart } = useCart();
+  const { addToWishlist, isInWishlist } = useWishlist();
+  const { isLoggedIn, openAuthPrompt } = useUser();
   const { showToast } = useToast();
 
   const products = outfit?.products || [];
@@ -26,6 +30,31 @@ export default function InteractiveOutfitCard({ outfit }) {
   });
 
   const [adding, setAdding] = useState(false);
+  const [savingWishlist, setSavingWishlist] = useState(false);
+
+  const allInWishlist = products.length > 0 && products.every((p) => isInWishlist(p.id || p.productId));
+
+  function handleSaveEntireOutfitToWishlist() {
+    if (!isLoggedIn) {
+      if (typeof openAuthPrompt === "function") {
+        openAuthPrompt("Vui lòng đăng nhập để lưu set đồ vào danh sách yêu thích");
+      } else {
+        showToast("Vui lòng đăng nhập để lưu set đồ yêu thích!");
+      }
+      return;
+    }
+    setSavingWishlist(true);
+    let count = 0;
+    products.forEach((p) => {
+      const pid = p.id || p.productId;
+      if (pid) {
+        addToWishlist(pid);
+        count++;
+      }
+    });
+    setSavingWishlist(false);
+    showToast(`❤️ Đã lưu ${count} món trong set đồ vào danh sách yêu thích!`);
+  }
 
   function handleSizeChange(prodId, size) {
     setSelections((prev) => ({
@@ -201,14 +230,27 @@ export default function InteractiveOutfitCard({ outfit }) {
           <span className={styles.totalAmount}>{formatPrice(total)}</span>
         </div>
 
-        <button
-          type="button"
-          className={`btn btn-primary ${styles.btnAddAll}`}
-          onClick={handleAddEntireOutfit}
-          disabled={adding}
-        >
-          {adding ? "Đang thêm..." : "🛍️ Thêm trọn bộ vào giỏ hàng"}
-        </button>
+        <div className={styles.footerActions}>
+          <button
+            type="button"
+            className={`${styles.btnSaveWishlist} ${allInWishlist ? styles.isSaved : ""}`}
+            onClick={handleSaveEntireOutfitToWishlist}
+            disabled={savingWishlist}
+            title="Lưu trọn bộ vào danh sách yêu thích"
+          >
+            <span>{allInWishlist ? "❤️" : "🤍"}</span>
+            <span>{allInWishlist ? "Đã lưu set đồ" : "Lưu set đồ"}</span>
+          </button>
+
+          <button
+            type="button"
+            className={`btn btn-primary ${styles.btnAddAll}`}
+            onClick={handleAddEntireOutfit}
+            disabled={adding}
+          >
+            {adding ? "Đang thêm..." : "🛍️ Mua trọn bộ"}
+          </button>
+        </div>
       </div>
     </div>
   );

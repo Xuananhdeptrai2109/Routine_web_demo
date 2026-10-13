@@ -8,9 +8,9 @@ const { sendSuccess, sendError } = require('../utils/response');
  */
 async function chat(req, res, next) {
   try {
-    const { message, history, currentProductId, userPreferences } = req.body;
-    if (!message || !message.trim()) {
-      return sendError(res, 'Vui lòng nhập nội dung câu hỏi cho AI Stylist', 400);
+    const { message, history, currentProductId, userPreferences, image } = req.body;
+    if ((!message || !message.trim()) && !image) {
+      return sendError(res, 'Vui lòng nhập nội dung câu hỏi hoặc gửi ảnh cho AI Stylist', 400);
     }
 
     let resolvedPreferences = userPreferences ? { ...userPreferences } : null;
@@ -35,10 +35,11 @@ async function chat(req, res, next) {
     }
 
     const result = await aiService.chatWithStylist({
-      message: message.trim(),
+      message: (message || '').trim(),
       history: Array.isArray(history) ? history : [],
       currentProductId: currentProductId || null,
       userPreferences: resolvedPreferences,
+      image: image || null,
     });
 
     return sendSuccess(

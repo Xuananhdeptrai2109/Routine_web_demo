@@ -198,6 +198,18 @@ export default function ProductInfo({ product, isOutOfStock: propOutOfStock }) {
     }
   }
 
+  function handleOpenStylist() {
+    if (typeof window !== "undefined") {
+      const event = new CustomEvent("open-ai-stylist", {
+        detail: {
+          productId: product.id,
+          productName: product.name,
+        },
+      });
+      window.dispatchEvent(event);
+    }
+  }
+
   const currentColorObj = resolveColor(selectedColor);
 
   return (
@@ -377,7 +389,7 @@ export default function ProductInfo({ product, isOutOfStock: propOutOfStock }) {
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 12, marginBottom: 32 }}>
+      <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
         <button
           type="button"
           className="btn btn-primary"
@@ -401,6 +413,34 @@ export default function ProductInfo({ product, isOutOfStock: propOutOfStock }) {
         <div style={{ display: "flex", alignItems: "center" }}>
           <WishlistButton productId={product.id} size="md" />
         </div>
+      </div>
+
+      {/* Complete The Look: Nhờ AI Stylist phối đồ với sản phẩm này */}
+      <div style={{ marginBottom: 32 }}>
+        <button
+          type="button"
+          onClick={handleOpenStylist}
+          style={{
+            width: "100%",
+            height: 46,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 10,
+            background: "linear-gradient(135deg, #18181b 0%, #27272a 100%)",
+            color: "#ffffff",
+            border: "1px solid rgba(255, 255, 255, 0.15)",
+            borderRadius: "var(--radius-sm, 4px)",
+            fontSize: 14,
+            fontWeight: 600,
+            cursor: "pointer",
+            boxShadow: "0 4px 12px rgba(0, 0, 0, 0.12)",
+            transition: "all 0.2s ease"
+          }}
+        >
+          <span style={{ fontSize: 17 }}>✨</span>
+          <span>Nhờ AI Stylist phối đồ với món này</span>
+        </button>
       </div>
 
       <div>

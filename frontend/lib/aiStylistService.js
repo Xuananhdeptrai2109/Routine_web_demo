@@ -6,7 +6,7 @@ import { fetchApi } from "./api";
 /**
  * Gửi tin nhắn đàm thoại thời gian thực với AI Stylist (Multi-turn Chat)
  */
-export async function sendStylistChatMessage({ message, history = [], currentProductId = null }) {
+export async function sendStylistChatMessage({ message, history = [], currentProductId = null, image = null }) {
   try {
     const res = await fetchApi('/ai/chat', {
       method: 'POST',
@@ -14,8 +14,9 @@ export async function sendStylistChatMessage({ message, history = [], currentPro
         message,
         history,
         currentProductId,
+        image,
       }),
-      timeout: 15000,
+      timeout: 25000,
     });
     if (res && res.message) {
       return res;

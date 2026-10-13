@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import AIStylistChat from "./AIStylistChat";
@@ -8,7 +8,23 @@ import styles from "./AIStylistFloatingWidget.module.css";
 
 export default function AIStylistFloatingWidget() {
   const [isOpen, setIsOpen] = useState(false);
+  const [customPrompt, setCustomPrompt] = useState("");
+  const [customProductId, setCustomProductId] = useState(null);
   const pathname = usePathname() || "";
+
+  useEffect(() => {
+    function handleOpenStylistEvent(e) {
+      setIsOpen(true);
+      if (e?.detail?.productId) {
+        setCustomProductId(e.detail.productId);
+      }
+      if (e?.detail?.productName) {
+        setCustomPrompt(`Gợi ý cho mình set đồ phối ăn ý nhất với "${e.detail.productName}"`);
+      }
+    }
+    window.addEventListener("open-ai-stylist", handleOpenStylistEvent);
+    return () => window.removeEventListener("open-ai-stylist", handleOpenStylistEvent);
+  }, []);
 
   // Ẩn nếu đang ở trang AI Stylist chính hoặc trang admin / auth
   if (
@@ -74,8 +90,8 @@ export default function AIStylistFloatingWidget() {
           <div className={styles.aiPopupBody}>
             <AIStylistChat
               embedded={true}
-              currentProductId={currentProductId}
-              initialPrompt={currentProductId ? "Gợi ý cho mình đồ phối hợp với sản phẩm này nhé" : ""}
+              currentProductId={customProductId || currentProductId}
+              initialPrompt={customPrompt || (currentProductId ? "Gợi ý cho mình đồ phối hợp với sản phẩm này nhé" : "")}
             />
           </div>
         </div>
