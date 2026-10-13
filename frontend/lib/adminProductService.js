@@ -45,7 +45,7 @@ function matchesFilters(product, filters) {
 
 export async function getProducts(filters = {}) {
   try {
-    const data = await fetchApi('/products?limit=100');
+    const data = await fetchApi('/products?limit=1000&sort=newest');
     if (data && Array.isArray(data.items) && data.items.length > 0) {
       // Sync local cache
       saveAll(data.items);

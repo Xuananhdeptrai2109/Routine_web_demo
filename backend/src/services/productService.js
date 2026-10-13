@@ -190,14 +190,16 @@ async function getProducts({
       list.sort((a, b) => b.price - a.price);
       break;
     case 'newest':
-      list.sort((a, b) => (b.badge === 'NEW' ? 1 : 0) - (a.badge === 'NEW' ? 1 : 0));
+      list.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
       break;
     case 'rating':
       list.sort((a, b) => (b.rating || 0) - (a.rating || 0));
       break;
     case 'recommended':
-    default:
       list.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+      break;
+    default:
+      // Giữ nguyên thứ tự createdAt: 'desc' từ Prisma database
       break;
   }
 

@@ -366,7 +366,7 @@ function formatOutfitForStylist(outfitRecord, intent = {}) {
   if (!outfitRecord) return null;
   const products = (outfitRecord.products || [])
     .map((op) => op.product || op)
-    .filter(Boolean)
+    .filter((p) => p && (p.stockQuantity === undefined || p.stockQuantity > 0))
     .map((p) => formatProductForStylist(p, intent))
     .filter(Boolean);
 
@@ -421,8 +421,13 @@ async function findBestCuratedOutfit(intent, userMessage = '') {
 
     for (const o of outfits) {
       let sc = 0;
-      const prods = (o.products || []).map((op) => op.product).filter(Boolean);
+      const prods = (o.products || [])
+        .map((op) => op.product)
+        .filter((p) => p && (p.stockQuantity === undefined || p.stockQuantity > 0));
       const total = prods.reduce((s, p) => s + (Number(p.price) || 0), 0);
+
+      // Nếu bộ outfit không còn sản phẩm nào còn hàng thì bỏ qua
+      if (prods.length === 0) continue;
 
       // Tránh lặp lại outfit đã gợi ý trước đó trong cuộc trò chuyện
       if (intent.previousOutfitIds && intent.previousOutfitIds.includes(o.id)) {

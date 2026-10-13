@@ -5,7 +5,7 @@ import { fetchApi } from "./api";
 
 export async function fetchAllProducts() {
   try {
-    const data = await fetchApi('/products?limit=100');
+    const data = await fetchApi('/products?limit=1000');
     if (data && data.items && data.items.length > 0) {
       return data.items;
     }
