@@ -41,7 +41,7 @@ export default function AdminSidebar({ mobileOpen, onClose }) {
     <>
       <div className={styles.brand}>
         <Link href="/admin" className={styles.brandLink} onClick={onClose}>
-          <span className={styles.brandName}>ROUTINE</span>
+          <span className={styles.brandName}>ROUTINE THU ĐÔNG</span>
           <span className={styles.brandSub}>ADMIN PANEL</span>
         </Link>
         <button type="button" className={styles.mobileClose} aria-label="Đóng menu" onClick={onClose}>

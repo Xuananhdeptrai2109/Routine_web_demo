@@ -5,10 +5,10 @@ import CategoryClient from "@/components/product/CategoryClient";
 export async function generateMetadata({ params }) {
   const slug = params?.slug;
   const category = await getCategoryBySlug(slug);
-  const title = category?.name ? `${category.name} — Routine Smart Fashion` : `${slug?.toUpperCase()} — Routine`;
+  const title = category?.name ? `${category.name} — Routine Thu Đông` : `${slug?.toUpperCase()} — Routine Thu Đông`;
   const description =
     category?.description ||
-    `Khám phá bộ sưu tập ${category?.name || slug} tại Routine. Thời trang tối giản, chất lượng vượt trội.`;
+    `Khám phá bộ sưu tập ${category?.name || slug} tại Routine Thu Đông. Thời trang tối giản, chất lượng vượt trội.`;
 
   return {
     title,

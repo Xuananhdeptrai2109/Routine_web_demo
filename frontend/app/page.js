@@ -129,7 +129,7 @@ export default function HomePage() {
 
         {/* Hero Content (STYLE THAT FITS YOU) */}
         <div className={homeStyles.heroContent}>
-          <span className={homeStyles.heroEyebrow}>ROUTINE — SMART FASHION</span>
+          <span className={homeStyles.heroEyebrow}>ROUTINE THU ĐÔNG — SMART FASHION</span>
           <h1 className={homeStyles.heroTitle}>
             {heroConfig?.title || "STYLE THAT FITS YOU"}
           </h1>

@@ -28,7 +28,7 @@ export default function AdminHeader({ onMenuClick }) {
         <button type="button" className={styles.menuBtn} aria-label="Mở menu" onClick={onMenuClick}>
           <IconMenu size={20} />
         </button>
-        <span className={styles.mobileBrand}>ROUTINE</span>
+        <span className={styles.mobileBrand}>ROUTINE THU ĐÔNG</span>
         <nav className={styles.breadcrumb} aria-label="Breadcrumb">
           <span className={styles.crumbCurrent}>{primaryLabel}</span>
           {trailing ? (

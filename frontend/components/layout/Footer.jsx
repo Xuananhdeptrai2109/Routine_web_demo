@@ -89,7 +89,7 @@ export default function Footer() {
     <footer style={{ background: "var(--color-bg-secondary)", marginTop: 40 }}>
       <div className="container footer-container">
         <div className="footer-header">
-          <span style={{ fontSize: 21, fontWeight: 700, letterSpacing: "0.14em" }}>ROUTINE</span>
+          <span style={{ fontSize: 21, fontWeight: 700, letterSpacing: "0.12em" }}>ROUTINE THU ĐÔNG</span>
           <div className="footer-social-wrap">
             <span className="footer-social-label">Theo dõi chúng tôi tại:</span>
             <div className="footer-socials">
@@ -126,7 +126,7 @@ export default function Footer() {
             justifyContent: "space-between"
           }}
         >
-          <p style={{ fontSize: 14, color: "var(--color-text-secondary)" }}>© 2026 Routine Smart Fashion</p>
+          <p style={{ fontSize: 14, color: "var(--color-text-secondary)" }}>© 2026 Routine Thu Đông</p>
         </div>
       </div>
 

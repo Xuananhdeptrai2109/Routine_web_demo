@@ -9,9 +9,9 @@ import { ToastProvider } from "@/components/common/Toast";
 import AppShell from "@/components/layout/AppShell";
 
 export const metadata = {
-  title: "Routine — Smart Fashion",
+  title: "Routine Thu Đông — Smart Fashion",
   description:
-    "Routine — nền tảng thời trang tối giản giúp bạn khám phá sản phẩm, xây dựng outfit và nhận gợi ý phong cách cá nhân."
+    "Routine Thu Đông — nền tảng thời trang tối giản giúp bạn khám phá sản phẩm, xây dựng outfit và nhận gợi ý phong cách cá nhân."
 };
 
 export const viewport = {

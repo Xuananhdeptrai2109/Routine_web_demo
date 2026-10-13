@@ -10,8 +10,8 @@ import AuthLogo from "./AuthLogo";
 export default function AuthLayout({
   children,
   imageSrc = "/images/hero/auth-hero.jpg",
-  imageAlt = "Không gian mua sắm tại cửa hàng Routine",
-  caption = "ROUTINE STORE — SMART FASHION & CONTEMPORARY LIFESTYLE",
+  imageAlt = "Không gian mua sắm tại cửa hàng Routine Thu Đông",
+  caption = "ROUTINE THU ĐÔNG — SMART FASHION & CONTEMPORARY LIFESTYLE",
   contentMaxWidth,
 }) {
   return (
