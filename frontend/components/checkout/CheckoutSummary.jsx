@@ -16,7 +16,7 @@ export default function CheckoutSummary({
   ctaLabel = "Continue to Payment",
   disabled = false
 }) {
-  const { voucherCode, discount: ctxDiscount, applyVoucher } = useCheckout();
+  const { voucherCode, discount: ctxDiscount, applyVoucher, address } = useCheckout();
   const currentDiscount = ctxDiscount !== undefined ? ctxDiscount : (propDiscount || 0);
 
   const [inputCode, setInputCode] = useState(voucherCode || "");
@@ -29,7 +29,7 @@ export default function CheckoutSummary({
     }
   }, [voucherCode]);
 
-  const shipping = subtotal === 0 ? 0 : getShippingFee(shippingMethod);
+  const shipping = subtotal === 0 ? 0 : getShippingFee(shippingMethod, address);
   const total = Math.max(subtotal + shipping - currentDiscount, 0);
 
   async function handleApplyVoucher(e) {

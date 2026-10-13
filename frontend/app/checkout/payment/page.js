@@ -47,7 +47,7 @@ export default function PaymentPage() {
     setIsProcessing(true);
     setError(null);
 
-    const shippingFee = getShippingFee(checkout.shippingMethod);
+    const shippingFee = getShippingFee(checkout.shippingMethod, checkout.address);
     const total = Math.max(subtotal + shippingFee - checkout.discount, 0);
 
     const customerEmail = checkout.contact?.email || user?.email || "";

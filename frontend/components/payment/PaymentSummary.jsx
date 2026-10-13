@@ -2,9 +2,12 @@
 
 import { formatPrice } from "@/lib/format";
 import { getShippingFee } from "@/lib/checkoutConstants";
+import { useCheckout } from "@/context/CheckoutContext";
 
-export default function PaymentSummary({ subtotal, shippingMethod, discount = 0, voucherCode = "", onPlaceOrder, isProcessing, error }) {
-  const shipping = getShippingFee(shippingMethod);
+export default function PaymentSummary({ subtotal, shippingMethod, discount = 0, voucherCode = "", onPlaceOrder, isProcessing, error, address: propAddress }) {
+  const checkout = useCheckout();
+  const address = propAddress !== undefined ? propAddress : checkout?.address;
+  const shipping = getShippingFee(shippingMethod, address);
   const total = Math.max(subtotal + shipping - discount, 0);
 
   return (

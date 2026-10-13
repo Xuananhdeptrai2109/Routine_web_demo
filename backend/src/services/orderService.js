@@ -126,6 +126,40 @@ async function formatOrder(o) {
   };
 }
 
+function calculateFallbackShipping(method, address) {
+  const norm = (typeof address === 'string' ? address : JSON.stringify(address || ''))
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .toLowerCase();
+
+  const isExpress = String(method || '').toLowerCase() === 'express';
+
+  // Tier 1: Q1, TP.HCM
+  if (norm.includes('ho chi minh') || norm.includes('tphcm') || norm.includes('sai gon') || norm.includes('quan 1')) {
+    return isExpress ? 50000 : 30000;
+  }
+  // Tier 2: Đông Nam Bộ & lân cận
+  if (norm.includes('binh duong') || norm.includes('dong nai') || norm.includes('long an') || norm.includes('ba ria') || norm.includes('vung tau') || norm.includes('tay ninh') || norm.includes('tien giang')) {
+    return isExpress ? 80000 : 35000;
+  }
+  // Tier 3: Miền Tây & Nam Trung Bộ cận
+  if (norm.includes('can tho') || norm.includes('ben tre') || norm.includes('vinh long') || norm.includes('lam dong') || norm.includes('an giang') || norm.includes('kien giang')) {
+    return isExpress ? 90000 : 40000;
+  }
+  // Tier 4: Miền Trung & Tây Nguyên
+  if (norm.includes('khanh hoa') || norm.includes('nha trang') || norm.includes('binh dinh') || norm.includes('dak lak') || norm.includes('quang nam')) {
+    return isExpress ? 100000 : 45000;
+  }
+  // Tier 5: Đà Nẵng, Huế, Hà Nội, Hải Phòng & Miền Bắc
+  if (norm.includes('ha noi') || norm.includes('hai phong') || norm.includes('da nang') || norm.includes('hue') || norm.includes('quang ninh')) {
+    return isExpress ? 120000 : 50000;
+  }
+
+  return isExpress ? 50000 : 30000;
+}
+
 /**
  * Tạo đơn hàng mới trong MySQL
  */
@@ -168,7 +202,7 @@ async function createOrder(identityId, orderInput) {
       ? Number(subtotal)
       : orderItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
-  let calculatedShipping = shipping !== undefined ? Number(shipping) : (calculatedSubtotal >= 500000 ? 0 : 30000);
+  let calculatedShipping = shipping !== undefined ? Number(shipping) : calculateFallbackShipping(shippingMethod, shippingAddress);
   let calculatedDiscount = discount !== undefined ? Number(discount) : 0;
   let finalCoupon = (appliedCoupon || couponCode || '').trim().toUpperCase() || null;
 

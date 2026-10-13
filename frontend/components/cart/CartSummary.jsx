@@ -10,7 +10,7 @@ import { validateCouponApi } from "@/lib/couponService";
 import { applyCouponApi, removeCouponApi } from "@/lib/cartService";
 
 export default function CartSummary({ subtotal, checkoutHref = "/checkout", ctaLabel = "Proceed to Checkout" }) {
-  const { shippingMethod, voucherCode, discount, applyVoucher } = useCheckout();
+  const { shippingMethod, voucherCode, discount, applyVoucher, address } = useCheckout();
   const [inputCode, setInputCode] = useState(voucherCode || "");
   const [isLoading, setIsLoading] = useState(false);
   const { showToast } = useToast();
@@ -21,7 +21,7 @@ export default function CartSummary({ subtotal, checkoutHref = "/checkout", ctaL
     }
   }, [voucherCode]);
 
-  const shipping = subtotal === 0 ? 0 : getShippingFee(shippingMethod);
+  const shipping = subtotal === 0 ? 0 : getShippingFee(shippingMethod, address);
   const total = Math.max(subtotal + shipping - discount, 0);
 
   async function handleApplyVoucher(e) {

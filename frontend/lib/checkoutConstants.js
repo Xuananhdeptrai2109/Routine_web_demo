@@ -2,25 +2,260 @@
 // Centralized so Cart, Checkout, Payment and Order Detail all agree
 // on the same labels/fees/status order.
 
-export const SHIPPING_METHODS = {
-  standard: {
-    id: "standard",
-    label: "Standard Delivery",
-    fee: 30000,
-    eta: "3–5 business days"
+// Bảng giá vận chuyển 5 bậc khoảng cách tính từ điểm gốc: Shop Routine tại Quận 1, TP. Hồ Chí Minh
+// Rẻ nhất: 30k (Standard) và 50k (Express) khi ở nội thành TP.HCM, càng xa càng thêm tiền.
+export const SHIPPING_RATES = {
+  tier1: {
+    name: "Nội thành TP.HCM (Gốc Q.1)",
+    standard: 30000,
+    express: 50000,
+    etaStandard: "1–2 ngày làm việc",
+    etaExpress: "2–4 giờ hoặc trong ngày"
   },
-  express: {
-    id: "express",
-    label: "Express Delivery",
-    fee: 50000,
-    eta: "1–2 business days"
+  tier2: {
+    name: "Đông Nam Bộ & Cận TP.HCM",
+    standard: 35000,
+    express: 80000,
+    etaStandard: "2–3 ngày làm việc",
+    etaExpress: "24 giờ"
+  },
+  tier3: {
+    name: "Tây Nam Bộ & Nam Trung Bộ",
+    standard: 40000,
+    express: 90000,
+    etaStandard: "3–4 ngày làm việc",
+    etaExpress: "1–2 ngày làm việc"
+  },
+  tier4: {
+    name: "Duyên hải Miền Trung & Tây Nguyên",
+    standard: 45000,
+    express: 100000,
+    etaStandard: "3–5 ngày làm việc",
+    etaExpress: "2 ngày làm việc"
+  },
+  tier5: {
+    name: "Bắc Trung Bộ & Miền Bắc (Hà Nội, Hải Phòng...)",
+    standard: 50000,
+    express: 120000,
+    etaStandard: "4–6 ngày làm việc",
+    etaExpress: "2–3 ngày làm việc"
   }
 };
 
 export const DEFAULT_SHIPPING_METHOD = "standard";
 
-export function getShippingFee(methodId) {
-  return SHIPPING_METHODS[methodId]?.fee ?? SHIPPING_METHODS[DEFAULT_SHIPPING_METHOD].fee;
+export const SHIPPING_METHODS = {
+  standard: {
+    id: "standard",
+    label: "Standard Delivery",
+    fee: SHIPPING_RATES.tier1.standard,
+    eta: SHIPPING_RATES.tier1.etaStandard
+  },
+  express: {
+    id: "express",
+    label: "Express Delivery",
+    fee: SHIPPING_RATES.tier1.express,
+    eta: SHIPPING_RATES.tier1.etaExpress
+  }
+};
+
+// Loại bỏ dấu tiếng Việt để so khớp địa danh
+export function removeVietnameseTones(str) {
+  if (!str) return "";
+  return String(str)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .toLowerCase()
+    .trim();
+}
+
+// Băm chuỗi FNV-1a để phân bổ đều các mức giá khi địa chỉ không khớp từ khóa
+function hashLocationKey(str) {
+  let hash = 2166136261;
+  for (let i = 0; i < str.length; i++) {
+    hash ^= str.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return Math.abs(hash);
+}
+
+/**
+ * Xác định phân vùng khoảng cách (Tier 1 đến 5) từ điểm gốc Quận 1, TP.HCM
+ */
+export function getShippingTier(address) {
+  if (!address) return "tier1";
+
+  let fullText = "";
+  if (typeof address === "string") {
+    fullText = address;
+  } else if (typeof address === "object") {
+    fullText = [
+      address.city || address.province || "",
+      address.district || "",
+      address.ward || "",
+      address.address || address.street || ""
+    ].filter(Boolean).join(" ");
+  }
+
+  const normalized = removeVietnameseTones(fullText);
+  if (!normalized) return "tier1";
+
+  // Tier 1: TP. Hồ Chí Minh (Gốc shop ở Quận 1)
+  if (
+    normalized.includes("ho chi minh") ||
+    normalized.includes("tphcm") ||
+    normalized.includes("tp hcm") ||
+    normalized.includes("sai gon") ||
+    normalized.includes("quan 1") ||
+    normalized.includes("quan 3") ||
+    normalized.includes("quan 5") ||
+    normalized.includes("quan 7") ||
+    normalized.includes("quan 10") ||
+    normalized.includes("thu duc") ||
+    normalized.includes("binh thanh") ||
+    normalized.includes("phu nhuan") ||
+    normalized.includes("tan binh") ||
+    normalized.includes("tan phu") ||
+    normalized.includes("go vap")
+  ) {
+    return "tier1";
+  }
+
+  // Tier 2: Đông Nam Bộ & các tỉnh giáp ranh TP.HCM (~30-120 km)
+  if (
+    normalized.includes("binh duong") ||
+    normalized.includes("dong nai") ||
+    normalized.includes("long an") ||
+    normalized.includes("ba ria") ||
+    normalized.includes("vung tau") ||
+    normalized.includes("tay ninh") ||
+    normalized.includes("tien giang")
+  ) {
+    return "tier2";
+  }
+
+  // Tier 3: Đồng bằng Sông Cửu Long (Tây Nam Bộ) & Nam Trung Bộ cận (~120-350 km)
+  if (
+    normalized.includes("can tho") ||
+    normalized.includes("ben tre") ||
+    normalized.includes("vinh long") ||
+    normalized.includes("tra vinh") ||
+    normalized.includes("dong thap") ||
+    normalized.includes("hau giang") ||
+    normalized.includes("soc trang") ||
+    normalized.includes("bac lieu") ||
+    normalized.includes("ca mau") ||
+    normalized.includes("an giang") ||
+    normalized.includes("kien giang") ||
+    normalized.includes("binh phuoc") ||
+    normalized.includes("binh thuan") ||
+    normalized.includes("ninh thuan") ||
+    normalized.includes("lam dong") ||
+    normalized.includes("da lat") ||
+    normalized.includes("dak nong")
+  ) {
+    return "tier3";
+  }
+
+  // Tier 4: Duyên hải Nam Trung Bộ & Tây Nguyên (~350-750 km)
+  if (
+    normalized.includes("khanh hoa") ||
+    normalized.includes("nha trang") ||
+    normalized.includes("phu yen") ||
+    normalized.includes("tuy hoa") ||
+    normalized.includes("binh dinh") ||
+    normalized.includes("quy nhon") ||
+    normalized.includes("quang ngai") ||
+    normalized.includes("quang nam") ||
+    normalized.includes("hoi an") ||
+    normalized.includes("dak lak") ||
+    normalized.includes("buon ma thuot") ||
+    normalized.includes("gia lai") ||
+    normalized.includes("pleiku") ||
+    normalized.includes("kon tum")
+  ) {
+    return "tier4";
+  }
+
+  // Tier 5: Miền Trung (Bắc Trung Bộ) & Toàn bộ Miền Bắc (> 750 km, xa nhất)
+  if (
+    normalized.includes("da nang") ||
+    normalized.includes("thua thien hue") ||
+    normalized.includes("hue") ||
+    normalized.includes("quang tri") ||
+    normalized.includes("quang binh") ||
+    normalized.includes("ha tinh") ||
+    normalized.includes("nghe an") ||
+    normalized.includes("thanh hoa") ||
+    normalized.includes("ha noi") ||
+    normalized.includes("hai phong") ||
+    normalized.includes("quang ninh") ||
+    normalized.includes("bac ninh") ||
+    normalized.includes("hai duong") ||
+    normalized.includes("hung yen") ||
+    normalized.includes("nam dinh") ||
+    normalized.includes("ninh binh") ||
+    normalized.includes("thai binh") ||
+    normalized.includes("vinh phuc") ||
+    normalized.includes("phu tho") ||
+    normalized.includes("thai nguyen") ||
+    normalized.includes("bac giang") ||
+    normalized.includes("lang son") ||
+    normalized.includes("cao bang") ||
+    normalized.includes("bac kan") ||
+    normalized.includes("tuyen quang") ||
+    normalized.includes("ha giang") ||
+    normalized.includes("yen bai") ||
+    normalized.includes("lao cai") ||
+    normalized.includes("lai chau") ||
+    normalized.includes("dien bien") ||
+    normalized.includes("son la") ||
+    normalized.includes("hoa binh")
+  ) {
+    return "tier5";
+  }
+
+  // Nếu không nhận diện được tên tỉnh rõ ràng, băm chuỗi để ngẫu nhiên vào 1 trong 5 bậc
+  const tiers = ["tier1", "tier2", "tier3", "tier4", "tier5"];
+  const index = hashLocationKey(normalized) % tiers.length;
+  return tiers[index];
+}
+
+/**
+ * Lấy danh sách phương thức vận chuyển với phí cập nhật theo địa chỉ
+ */
+export function getShippingMethods(address = null) {
+  const tier = getShippingTier(address);
+  const info = SHIPPING_RATES[tier] || SHIPPING_RATES.tier1;
+
+  return {
+    standard: {
+      id: "standard",
+      label: "Standard Delivery",
+      fee: info.standard,
+      eta: info.etaStandard,
+      zoneName: info.name
+    },
+    express: {
+      id: "express",
+      label: "Express Delivery",
+      fee: info.express,
+      eta: info.etaExpress,
+      zoneName: info.name
+    }
+  };
+}
+
+/**
+ * Tính phí giao hàng theo phương thức và địa chỉ (tính từ gốc Quận 1, HCM)
+ */
+export function getShippingFee(methodId = "standard", address = null) {
+  const method = String(methodId || "standard").toLowerCase() === "express" ? "express" : "standard";
+  const tier = getShippingTier(address);
+  const info = SHIPPING_RATES[tier] || SHIPPING_RATES.tier1;
+  return info[method];
 }
 
 export const PAYMENT_METHODS = [
