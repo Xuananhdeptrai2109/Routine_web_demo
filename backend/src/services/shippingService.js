@@ -65,119 +65,228 @@ function calculateHaversineDistance(lat1, lon1, lat2, lon2) {
 }
 
 /**
- * Gọi Google Maps Geocoding API hoặc Nominatim fallback để xác minh địa chỉ
+ * Chuẩn hóa chuỗi tiếng Việt không dấu để so khớp từ khóa địa lý
  */
-async function geocodeAddress(addressText) {
+function normalizeText(text) {
+  return (text || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .toLowerCase();
+}
+
+/**
+ * Danh sách 63 tỉnh/thành phố chuẩn của Việt Nam
+ */
+const VN_PROVINCES = [
+  'ha noi', 'ho chi minh', 'hcm', 'tphcm', 'tp hcm', 'sai gon', 'hai phong', 'da nang', 'can tho',
+  'an giang', 'ba ria', 'vung tau', 'bac giang', 'bac kan', 'bac lieu', 'bac ninh', 'ben tre',
+  'binh dinh', 'binh duong', 'binh phuoc', 'binh thuan', 'ca mau', 'cao bang', 'dak lak', 'dak nong',
+  'dien bien', 'dong nai', 'dong thap', 'gia lai', 'ha giang', 'ha nam', 'ha tinh', 'hai duong',
+  'hau giang', 'hoa binh', 'hung yen', 'khanh hoa', 'nha trang', 'kien giang', 'kon tum', 'lai chau',
+  'lam dong', 'da lat', 'lang son', 'lao cai', 'long an', 'nam dinh', 'nghe an', 'vinh', 'ninh binh',
+  'ninh thuan', 'phu tho', 'phu yen', 'quang binh', 'quang nam', 'quang ngai', 'quang ninh', 'ha long',
+  'quang tri', 'soc trang', 'son la', 'tay ninh', 'thai binh', 'thai nguyen', 'thanh hoa', 'hue',
+  'thua thien hue', 'tien giang', 'my tho', 'tra vinh', 'tuyen quang', 'vinh long', 'vinh phuc', 'yen bai'
+];
+
+function isKnownProvince(city) {
+  const norm = normalizeText(city).trim();
+  if (norm.length < 2) return false;
+  return VN_PROVINCES.some((p) => norm.includes(p));
+}
+
+/**
+ * Gọi Google Maps Geocoding API hoặc Nominatim fallback để xác minh khu vực hành chính (Phường/Xã, Quận/Huyện, Tỉnh/Thành)
+ */
+async function geocodeAddress(addressText, components = {}) {
   const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+
+  // Xây dựng danh sách truy vấn khu vực hành chính
+  const adminQueries = [];
+  const ward = (components.ward || "").trim();
+  const district = (components.district || "").trim();
+  const city = (components.city || "").trim();
+
+  if (ward && district && city) {
+    adminQueries.push(`${ward}, ${district}, ${city}`);
+  }
+  if (district && city) {
+    adminQueries.push(`${district}, ${city}`);
+  }
+  if (ward && city) {
+    adminQueries.push(`${ward}, ${city}`);
+  }
+  if (city) {
+    adminQueries.push(city);
+  }
+  if (adminQueries.length === 0 && addressText) {
+    adminQueries.push(addressText.replace(/Việt Nam/gi, "").trim());
+  }
 
   // 1. Thử gọi Google Maps Geocoding API nếu đã cấu hình API Key
   if (apiKey && apiKey.trim() !== "" && !apiKey.startsWith("YOUR_")) {
-    try {
-      const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
-        addressText
-      )}&key=${apiKey}&components=country:VN&language=vi`;
-      const res = await fetch(url);
-      const data = await res.json();
+    for (const q of adminQueries) {
+      try {
+        const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
+          q
+        )}&key=${apiKey}&components=country:VN&language=vi`;
+        const res = await fetch(url);
+        const data = await res.json();
 
-      if (data.status === "OK" && data.results && data.results.length > 0) {
-        const top = data.results[0];
-        const locationType = top.geometry?.location_type;
-        // Bác bỏ nếu độ tin cậy quá thấp hoặc không khớp
-        return {
-          valid: true,
-          lat: top.geometry.location.lat,
-          lng: top.geometry.location.lng,
-          formattedAddress: top.formatted_address,
-          source: "google_maps",
-        };
-      } else if (data.status === "ZERO_RESULTS") {
-        return { valid: false, message: "Không tìm thấy địa điểm này trên Google Maps." };
+        if (data.status === "OK" && data.results && data.results.length > 0) {
+          const top = data.results[0];
+          return {
+            valid: true,
+            lat: top.geometry.location.lat,
+            lng: top.geometry.location.lng,
+            formattedAddress: top.formatted_address,
+            source: "google_maps",
+          };
+        }
+      } catch (err) {
+        console.warn("[shippingService] Google Geocoding API error, fallback to OSM:", err.message);
+        break;
       }
-    } catch (err) {
-      console.warn("[shippingService] Google Geocoding API error, fallback to OSM:", err.message);
     }
   }
 
   // 2. Fallback Nominatim / OpenStreetMap Geocoding (Miễn phí, chuẩn xác toàn cầu)
-  try {
-    const cleanQuery = addressText.replace(/Việt Nam/gi, "").trim() + ", Việt Nam";
-    const osmUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
-      cleanQuery
-    )}&format=json&countrycodes=vn&limit=1&accept-language=vi`;
+  for (const query of adminQueries) {
+    try {
+      const qWithCountry = query + ", Việt Nam";
+      const osmUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
+        qWithCountry
+      )}&format=json&countrycodes=vn&limit=1&accept-language=vi`;
 
-    const res = await fetch(osmUrl, {
-      headers: {
-        "User-Agent": "RoutineWebECommerce/1.0 (contact@routine.vn)",
-      },
-    });
+      const res = await fetch(osmUrl, {
+        headers: {
+          "User-Agent": "RoutineWebECommerce/1.0 (contact@routine.vn)",
+        },
+      });
 
-    if (res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data) && data.length > 0) {
-        const top = data[0];
-        return {
-          valid: true,
-          lat: parseFloat(top.lat),
-          lng: parseFloat(top.lon),
-          formattedAddress: top.display_name,
-          source: "nominatim_osm",
-        };
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          const top = data[0];
+          return {
+            valid: true,
+            lat: parseFloat(top.lat),
+            lng: parseFloat(top.lon),
+            formattedAddress: top.display_name,
+            source: "nominatim_osm",
+          };
+        }
       }
+    } catch (err) {
+      console.warn("[shippingService] Nominatim OSM query error:", err.message);
     }
-  } catch (err) {
-    console.warn("[shippingService] Nominatim OSM geocoding error:", err.message);
   }
 
-  // 3. Fallback theo từ khóa danh mục quận/huyện/thành phố nếu các dịch vụ online bị chặn/hạn ngạch
-  const fallbackCoord = getApproxCoordinatesFromText(addressText);
+  // 3. Fallback theo danh mục hành chính quận/huyện/thành phố nội bộ
+  const fallbackCoord = getApproxCoordinatesFromText(adminQueries.join(", "), components);
   if (fallbackCoord) {
     return {
       valid: true,
       lat: fallbackCoord.lat,
       lng: fallbackCoord.lng,
-      formattedAddress: addressText,
+      formattedAddress: adminQueries[0] || addressText,
       source: "local_vn_directory",
     };
   }
 
   return {
     valid: false,
-    message: "Địa chỉ không tồn tại hoặc không thể định vị. Vui lòng nhập lại số nhà, tên đường, quận/huyện và tỉnh/thành phố rõ ràng hơn.",
+    message: "Khu vực Phường/Xã, Quận/Huyện hoặc Tỉnh/Thành phố không thể định vị. Vui lòng kiểm tra lại tên đơn vị hành chính.",
   };
 }
 
 /**
- * Tọa độ dự phòng cho các tỉnh thành phố chính của Việt Nam
+ * Tọa độ dự phòng cho các tỉnh thành phố chính của Việt Nam theo phân cấp địa lý
  */
-function getApproxCoordinatesFromText(text) {
-  const norm = (text || "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/đ/g, "d")
-    .toLowerCase();
+function getApproxCoordinatesFromText(text, components = {}) {
+  const norm = normalizeText(text);
+  const normCity = normalizeText(components.city || "");
+  const normDistrict = normalizeText(components.district || "");
 
-  // Kiểm tra nếu chuỗi chỉ gồm ký tự linh tinh vô nghĩa (< 8 ký tự hoặc toàn chữ ngẫu nhiên)
-  if (norm.length < 8 || /^([a-z])\1+$/.test(norm)) return null;
+  // Kiểm tra nếu chuỗi chỉ gồm ký tự linh tinh vô nghĩa (< 6 ký tự hoặc toàn chữ ngẫu nhiên)
+  if (norm.length < 6 || /^([a-z0-9])\1+$/.test(norm)) return null;
 
-  if (norm.includes("quan 1") || norm.includes("ben nghe") || norm.includes("sai gon")) return { lat: 10.7769, lng: 106.7009 };
-  if (norm.includes("quan 10") || norm.includes("su van hanh")) return { lat: 10.7738, lng: 106.6687 };
-  if (norm.includes("go vap") || norm.includes("quang trung")) return { lat: 10.8354, lng: 106.6669 };
-  if (norm.includes("thu duc") || norm.includes("vo van ngan")) return { lat: 10.8509, lng: 106.7645 };
-  if (norm.includes("tan phu") || norm.includes("au co")) return { lat: 10.7925, lng: 106.6437 };
-  if (norm.includes("phu nhuan") || norm.includes("hoa lan")) return { lat: 10.7967, lng: 106.6896 };
-  if (norm.includes("quan 7") || norm.includes("nguyen thi thap")) return { lat: 10.7388, lng: 106.7093 };
-  if (norm.includes("binh tan")) return { lat: 10.7428, lng: 106.6115 };
-  if (norm.includes("ho chi minh") || norm.includes("tphcm") || norm.includes("tp hcm")) return { lat: 10.7769, lng: 106.7009 };
+  // 1. Phân vùng HÀ NỘI
+  const isHanoi =
+    normCity.includes("ha noi") ||
+    normCity.includes("hn") ||
+    norm.includes("ha noi") ||
+    norm.includes("tp ha noi") ||
+    norm.includes("thu do");
 
-  if (norm.includes("dong da") || norm.includes("chua boc")) return { lat: 21.0076, lng: 105.8291 };
-  if (norm.includes("long bien")) return { lat: 21.0261, lng: 105.9018 };
-  if (norm.includes("ha dong")) return { lat: 20.9784, lng: 105.7538 };
-  if (norm.includes("cau giay")) return { lat: 21.0336, lng: 105.7972 };
-  if (norm.includes("hai ba trung") || norm.includes("mai hac de")) return { lat: 21.0116, lng: 105.8502 };
-  if (norm.includes("ha noi")) return { lat: 21.0285, lng: 105.8542 };
+  if (isHanoi) {
+    if (norm.includes("dong da") || norm.includes("chua boc") || normDistrict.includes("dong da"))
+      return { lat: 21.0076, lng: 105.8291 };
+    if (norm.includes("long bien") || normDistrict.includes("long bien"))
+      return { lat: 21.0261, lng: 105.9018 };
+    if (norm.includes("ha dong") || normDistrict.includes("ha dong"))
+      return { lat: 20.9784, lng: 105.7538 };
+    if (norm.includes("cau giay") || normDistrict.includes("cau giay"))
+      return { lat: 21.0336, lng: 105.7972 };
+    if (norm.includes("hai ba trung") || norm.includes("mai hac de") || normDistrict.includes("hai ba trung"))
+      return { lat: 21.0116, lng: 105.8502 };
+    if (norm.includes("hoan kiem") || norm.includes("ba dinh"))
+      return { lat: 21.0313, lng: 105.8450 };
+    if (norm.includes("thanh xuan"))
+      return { lat: 20.9980, lng: 105.8120 };
+    if (norm.includes("tay ho"))
+      return { lat: 21.0664, lng: 105.8236 };
+    return { lat: 21.0285, lng: 105.8542 }; // Trung tâm Hà Nội
+  }
 
-  if (norm.includes("da nang")) return { lat: 16.0544, lng: 108.2022 };
-  if (norm.includes("hai phong")) return { lat: 20.8449, lng: 106.6881 };
+  // 2. Phân vùng TP. HỒ CHÍ MINH
+  const isHcm =
+    normCity.includes("ho chi minh") ||
+    normCity.includes("tphcm") ||
+    normCity.includes("tp hcm") ||
+    normCity.includes("sai gon") ||
+    normCity.includes("hcm") ||
+    norm.includes("ho chi minh") ||
+    norm.includes("tphcm") ||
+    norm.includes("tp hcm") ||
+    norm.includes("sai gon");
+
+  if (isHcm) {
+    if (norm.includes("quan 1") || norm.includes("ben nghe") || norm.includes("le loi") || normDistrict === "1")
+      return { lat: 10.7744, lng: 106.7011 };
+    if (norm.includes("quan 10") || norm.includes("su van hanh") || normDistrict === "10")
+      return { lat: 10.7738, lng: 106.6687 };
+    if (norm.includes("go vap") || normDistrict.includes("go vap"))
+      return { lat: 10.8354, lng: 106.6669 };
+    if (norm.includes("thu duc") || norm.includes("vo van ngan") || normDistrict.includes("thu duc"))
+      return { lat: 10.8509, lng: 106.7645 };
+    if (norm.includes("tan phu") || norm.includes("au co") || normDistrict.includes("tan phu"))
+      return { lat: 10.7925, lng: 106.6437 };
+    if (norm.includes("phu nhuan") || norm.includes("hoa lan") || normDistrict.includes("phu nhuan"))
+      return { lat: 10.7967, lng: 106.6896 };
+    if (norm.includes("quan 7") || norm.includes("nguyen thi thap") || normDistrict === "7")
+      return { lat: 10.7388, lng: 106.7093 };
+    if (norm.includes("binh tan") || normDistrict.includes("binh tan"))
+      return { lat: 10.7428, lng: 106.6115 };
+    if (norm.includes("binh thanh"))
+      return { lat: 10.8014, lng: 106.6984 };
+    if (norm.includes("tan binh"))
+      return { lat: 10.7992, lng: 106.6531 };
+    if (norm.includes("quan 3") || normDistrict === "3")
+      return { lat: 10.7797, lng: 106.6859 };
+    if (norm.includes("quan 5") || normDistrict === "5")
+      return { lat: 10.7554, lng: 106.6644 };
+    return { lat: 10.7769, lng: 106.7009 }; // Trung tâm TP.HCM
+  }
+
+  // 3. Phân vùng các tỉnh thành có Showroom Routine
+  if (norm.includes("da nang")) {
+    if (norm.includes("nguyen van thoai") || norm.includes("son tra") || norm.includes("ngu hanh son"))
+      return { lat: 16.0562, lng: 108.2392 };
+    return { lat: 16.0694, lng: 108.2125 };
+  }
+  if (norm.includes("hai phong")) return { lat: 20.8358, lng: 106.6917 };
   if (norm.includes("vung tau") || norm.includes("ba ria")) return { lat: 10.3524, lng: 107.0812 };
   if (norm.includes("binh duong") || norm.includes("thu dau mot")) return { lat: 10.9786, lng: 106.6575 };
   if (norm.includes("dong nai") || norm.includes("bien hoa")) return { lat: 10.9574, lng: 106.8427 };
@@ -187,6 +296,10 @@ function getApproxCoordinatesFromText(text) {
   if (norm.includes("quang ngai")) return { lat: 15.1225, lng: 108.7997 };
   if (norm.includes("lao cai")) return { lat: 22.4839, lng: 103.9715 };
   if (norm.includes("lang son")) return { lat: 21.8491, lng: 106.7578 };
+
+  // 4. Nếu không ghi tên tỉnh rõ ràng nhưng có tên đường đặc trưng độc nhất
+  if (norm.includes("chua boc") || norm.includes("mai hac de")) return { lat: 21.0076, lng: 105.8291 };
+  if (norm.includes("su van hanh") || norm.includes("vo van ngan")) return { lat: 10.7738, lng: 106.6687 };
 
   return null;
 }
@@ -233,47 +346,103 @@ async function findNearestRoutineStore(lat, lng) {
 }
 
 /**
- * Kiểm tra tính hợp lệ của địa chỉ và tính khoảng cách tới cửa hàng gần nhất
+ * Kiểm tra tính hợp lệ của khu vực hành chính (Phường/Xã, Quận/Huyện, Tỉnh/Thành phố)
+ * và tính khoảng cách tới showroom gần nhất.
+ * Địa chỉ chi tiết (số nhà, tên đường, căn hộ...) được giữ nguyên để giao hàng và không bắt buộc check bản đồ.
  */
 async function validateAndLocateAddress(addressInput) {
   let fullAddress = "";
+  let components = {};
+
   if (typeof addressInput === "string") {
-    fullAddress = addressInput;
+    fullAddress = (addressInput || "").trim();
+    const parts = fullAddress.split(",").map((p) => p.trim()).filter(Boolean);
+    if (parts.length >= 3) {
+      components = {
+        street: parts.slice(0, parts.length - 3).join(", ") || parts[0],
+        ward: parts[parts.length - 3] || "",
+        district: parts[parts.length - 2] || "",
+        city: parts[parts.length - 1] || "",
+      };
+    } else {
+      components = {
+        street: fullAddress,
+        ward: "",
+        district: parts[0] || "",
+        city: parts[parts.length - 1] || "",
+      };
+    }
   } else if (typeof addressInput === "object" && addressInput !== null) {
-    fullAddress = [
-      addressInput.address || addressInput.street || "",
-      addressInput.ward || "",
-      addressInput.district || "",
-      addressInput.city || addressInput.province || "",
-    ]
+    components = {
+      street: (addressInput.address || addressInput.street || "").trim(),
+      ward: (addressInput.ward || "").trim(),
+      district: (addressInput.district || "").trim(),
+      city: (addressInput.city || addressInput.province || "").trim(),
+    };
+    fullAddress = [components.street, components.ward, components.district, components.city]
       .filter(Boolean)
       .join(", ");
   }
 
-  if (!fullAddress || fullAddress.trim().length < 5) {
+  // 1. Kiểm tra không để trống các trường đơn vị hành chính & địa chỉ chi tiết
+  if (!components.city) {
     return {
       valid: false,
-      message: "Vui lòng nhập đầy đủ địa chỉ giao hàng.",
+      message: "Vui lòng chọn hoặc nhập Tỉnh/Thành phố.",
     };
   }
 
-  // Geocoding xác minh địa điểm
-  const geoResult = await geocodeAddress(fullAddress);
+  if (!isKnownProvince(components.city)) {
+    return {
+      valid: false,
+      message: "Tỉnh/Thành phố không hợp lệ hoặc không thuộc Việt Nam. Vui lòng kiểm tra lại.",
+    };
+  }
+
+  if (!components.district || normalizeText(components.district).length < 2 || /^([a-z0-9])\1+$/i.test(normalizeText(components.district))) {
+    return {
+      valid: false,
+      message: "Quận/Huyện không hợp lệ. Vui lòng kiểm tra lại.",
+    };
+  }
+
+  if (!components.ward || normalizeText(components.ward).length < 2 || /^([a-z0-9])\1+$/i.test(normalizeText(components.ward))) {
+    return {
+      valid: false,
+      message: "Phường/Xã không hợp lệ. Vui lòng kiểm tra lại.",
+    };
+  }
+
+  if (!components.street) {
+    return {
+      valid: false,
+      message: "Vui lòng nhập địa chỉ chi tiết (số nhà, tên đường, căn hộ...).",
+    };
+  }
+
+  // 2. Chỉ Geocode và kiểm tra bản đồ trên Khu vực Hành chính (Phường/Xã, Quận/Huyện, Tỉnh/Thành)
+  // Địa chỉ chi tiết (street) KHÔNG bị đem đi kiểm tra bản đồ, giúp tránh lỗi địa chỉ ngõ ngách không có trên Google Maps / OSM
+  const adminAreaText = [components.ward, components.district, components.city]
+    .filter(Boolean)
+    .join(", ");
+
+  const geoResult = await geocodeAddress(adminAreaText, components);
   if (!geoResult.valid) {
     return {
       valid: false,
       message:
         geoResult.message ||
-        "Địa chỉ không tồn tại hoặc không thể định vị trên Google Maps. Vui lòng kiểm tra lại số nhà, tên đường, quận/huyện và tỉnh/thành phố.",
+        "Không thể xác định vị trí Phường/Xã, Quận/Huyện hoặc Tỉnh/Thành phố này. Vui lòng kiểm tra lại tên đơn vị hành chính.",
     };
   }
 
-  // Tìm cửa hàng gần nhất
+  // Tìm cửa hàng gần nhất theo tọa độ của khu vực hành chính
   const nearestStore = await findNearestRoutineStore(geoResult.lat, geoResult.lng);
 
   return {
     valid: true,
-    formattedAddress: geoResult.formattedAddress || fullAddress,
+    formattedAddress: fullAddress, // Giữ trọn vẹn số nhà/tên đường chi tiết khách nhập
+    adminArea: adminAreaText,
     coordinates: {
       lat: geoResult.lat,
       lng: geoResult.lng,

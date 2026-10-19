@@ -4,7 +4,8 @@
 
 export function isValidVietnamesePhone(value) {
   if (!value) return false;
-  return Boolean(value.trim().length > 0);
+  const clean = value.toString().trim().replace(/[\s.-]/g, "");
+  return /^(0|\+84|84)(3|5|7|8|9)[0-9]{8}$/.test(clean);
 }
 
 export function isValidEmail(value) {

@@ -43,9 +43,9 @@ export default function AddressForm({ initialValues, onSave, onCancel }) {
       if (!geoResult || !geoResult.valid) {
         setMapError(
           geoResult?.message ||
-            "Địa chỉ không tồn tại hoặc không thể định vị trên Google Maps. Vui lòng nhập lại số nhà, tên đường, quận/huyện và tỉnh/thành phố chính xác."
+            "Khu vực Phường/Xã, Quận/Huyện hoặc Tỉnh/Thành phố không thể định vị. Vui lòng kiểm tra lại."
         );
-        showToast("Địa chỉ không tồn tại trên bản đồ. Vui lòng kiểm tra lại.");
+        showToast("Khu vực Phường/Xã, Quận/Huyện không hợp lệ. Vui lòng kiểm tra lại.");
         return;
       }
 
