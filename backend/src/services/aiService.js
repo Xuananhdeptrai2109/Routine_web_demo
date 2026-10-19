@@ -6,15 +6,16 @@
 const prisma = require('../config/prisma');
 const outfitService = require('./outfitService');
 const sizeGuideService = require('./sizeGuideService');
+const vectorEngine = require('./vectorEngine');
 const { normalizeFashionQuery } = require('../utils/fashionThesaurus');
 
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
-const GEMINI_MODELS = ['gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
+const GEMINI_MODELS = ['gemini-flash-lite-latest', 'gemini-flash-latest', 'gemini-2.5-flash-lite'];
 
 /**
  * Gọi Google Gemini REST API hỗ trợ chat đa lượt & generation config
  */
-async function callGeminiApi({ contents, systemInstruction, model = 'gemini-3.5-flash', temperature = 0.7, responseMimeType = null }) {
+async function callGeminiApi({ contents, systemInstruction, model = 'gemini-flash-lite-latest', temperature = 0.7, responseMimeType = null }) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     return null;
@@ -311,6 +312,11 @@ function isAccessory(p) {
  */
 function formatProductForStylist(p, intent = {}) {
   if (!p) return null;
+  // Kiểm tra tồn kho nghiêm ngặt: Tuyệt đối không giới thiệu sản phẩm đã hết hàng
+  if (p.stockQuantity !== undefined && Number(p.stockQuantity) <= 0) {
+    return null;
+  }
+
   let mainImg = '';
   if (Array.isArray(p.images) && p.images.length > 0) mainImg = p.images[0];
   else if (typeof p.images === 'string') {
@@ -350,6 +356,7 @@ function formatProductForStylist(p, intent = {}) {
     name: p.name,
     price: Number(p.price) || 0,
     originalPrice: Number(p.originalPrice || p.price) || 0,
+    stockQuantity: Number(p.stockQuantity !== undefined ? p.stockQuantity : 100),
     image: mainImg || '/images/placeholder.jpg',
     images: Array.isArray(p.images) && p.images.length > 0 ? p.images : [mainImg || '/images/placeholder.jpg'],
     sizes: finalSizes,
@@ -366,9 +373,12 @@ function formatOutfitForStylist(outfitRecord, intent = {}) {
   if (!outfitRecord) return null;
   const products = (outfitRecord.products || [])
     .map((op) => op.product || op)
-    .filter((p) => p && (p.stockQuantity === undefined || p.stockQuantity > 0))
+    .filter((p) => p && (Number(p.stockQuantity) > 0 || (p.stockQuantity === undefined && p.stock_quantity > 0)))
     .map((p) => formatProductForStylist(p, intent))
     .filter(Boolean);
+
+  // Nếu bộ outfit mẫu bị thiếu hàng (còn ít hơn 2 sản phẩm còn hàng), hủy gợi ý outfit này
+  if (products.length < 2) return null;
 
   const total = products.reduce((sum, item) => sum + item.price, 0);
 
@@ -423,11 +433,11 @@ async function findBestCuratedOutfit(intent, userMessage = '') {
       let sc = 0;
       const prods = (o.products || [])
         .map((op) => op.product)
-        .filter((p) => p && (p.stockQuantity === undefined || p.stockQuantity > 0));
+        .filter((p) => p && Number(p.stockQuantity) > 0);
       const total = prods.reduce((s, p) => s + (Number(p.price) || 0), 0);
 
-      // Nếu bộ outfit không còn sản phẩm nào còn hàng thì bỏ qua
-      if (prods.length === 0) continue;
+      // Nếu bộ outfit có bất kỳ món nào hết hàng hoặc không đủ 2 món còn hàng thì bỏ qua
+      if (prods.length < 2 || prods.length < (o.products || []).length) continue;
 
       // Tránh lặp lại outfit đã gợi ý trước đó trong cuộc trò chuyện
       if (intent.previousOutfitIds && intent.previousOutfitIds.includes(o.id)) {
@@ -518,17 +528,18 @@ async function assembleDynamicOutfit(intent, currentProduct = null, userMessage 
   const targetFit = intent.fit || null;
   const budget = intent.budget || 2000000;
   const qLower = (userMessage || '').toLowerCase();
+  const { qx, qy } = vectorEngine.projectQueryTo2DVector(userMessage);
 
   const excludes = (intent.excludeProductNames || []).map((n) => n.toLowerCase());
   const keeps = (intent.keepProductNames || []).map((n) => n.toLowerCase());
 
-  // Lấy danh sách sản phẩm thực tế từ MySQL
+  // Lấy toàn bộ danh sách sản phẩm còn hàng thực tế từ MySQL (bỏ giới hạn take: 60 để không sót đồ len/quần)
   const allProducts = await prisma.product.findMany({
     where: {
       stockQuantity: { gt: 0 },
       ...(gender !== 'unisex' ? { gender: { in: [gender, 'unisex'] } } : {}),
     },
-    take: 60,
+    take: 300,
     orderBy: { isFeatured: 'desc' },
   });
 
@@ -601,6 +612,14 @@ async function assembleDynamicOutfit(intent, currentProduct = null, userMessage 
       if (colorsStr.includes(targetColor) || name.includes(targetColor)) sc += 15;
     }
 
+    // Thưởng điểm định vị không gian Vector 2D (càng gần tọa độ mục tiêu thì điểm càng cao)
+    const pVx = p.vector_x ?? p.vectorX;
+    const pVy = p.vector_y ?? p.vectorY;
+    if (pVx !== null && pVx !== undefined && pVy !== null && pVy !== undefined) {
+      const dist2d = Math.hypot(Number(pVx) - qx, Number(pVy) - qy);
+      sc += Math.max(0, 25 - dist2d * 2.5);
+    }
+
     if (p.isFeatured) sc += 2;
     return sc;
   }
@@ -653,6 +672,14 @@ async function assembleDynamicOutfit(intent, currentProduct = null, userMessage 
       }
     }
 
+    // Thưởng điểm định vị không gian Vector 2D (càng gần tọa độ mục tiêu thì điểm càng cao)
+    const pVxBottom = p.vector_x ?? p.vectorX;
+    const pVyBottom = p.vector_y ?? p.vectorY;
+    if (pVxBottom !== null && pVxBottom !== undefined && pVyBottom !== null && pVyBottom !== undefined) {
+      const dist2d = Math.hypot(Number(pVxBottom) - qx, Number(pVyBottom) - qy);
+      sc += Math.max(0, 25 - dist2d * 2.5);
+    }
+
     if (p.isFeatured) sc += 2;
     return sc;
   }
@@ -681,6 +708,15 @@ async function assembleDynamicOutfit(intent, currentProduct = null, userMessage 
       const colorsStr = JSON.stringify(p.colors || []).toLowerCase();
       if (colorsStr.includes(targetColor) || name.includes(targetColor)) sc += 15;
     }
+
+    // Thưởng điểm định vị không gian Vector 2D cho áo khoác
+    const pVxOuter = p.vector_x ?? p.vectorX;
+    const pVyOuter = p.vector_y ?? p.vectorY;
+    if (pVxOuter !== null && pVxOuter !== undefined && pVyOuter !== null && pVyOuter !== undefined) {
+      const dist2d = Math.hypot(Number(pVxOuter) - qx, Number(pVyOuter) - qy);
+      sc += Math.max(0, 25 - dist2d * 2.5);
+    }
+
     if (p.isFeatured) sc += 5;
     return sc;
   }
@@ -709,13 +745,24 @@ async function assembleDynamicOutfit(intent, currentProduct = null, userMessage 
     chosenOuterwear = scoredOuterwears[0]?.product || outerwears[0];
   }
 
-  // Tùy chọn thêm phụ kiện (Giày / Thắt lưng / Mũ) nếu ngân sách thoải mái
-  const currentTotal = (Number(chosenTop?.price) || 0) + (Number(chosenBottom?.price) || 0) + (Number(chosenOuterwear?.price) || 0);
-  if (budget >= currentTotal + 300000 && accessories.length > 0) {
-    if (intent.occasion === 'office') {
-      chosenAccessory = accessories.find((a) => a.name.toLowerCase().includes('belt') || a.name.toLowerCase().includes('canvas sneakers')) || null;
-    } else {
-      chosenAccessory = accessories.find((a) => a.name.toLowerCase().includes('sneakers') || a.name.toLowerCase().includes('hat')) || null;
+  // CHỈ bổ sung phụ kiện khi khách hàng CÓ NHU CẦU CỤ THỂ hoặc hỏi về phụ kiện (mũ, thắt lưng, túi, giày...)
+  // TUYỆT ĐỐI không tự động nhét Bucket Hat hay nón vào các set đồ khi khách không hỏi, đặc biệt là đồ len / dệt kim / công sở!
+  const isWinterOrKnit = qLower.includes('len') || qLower.includes('dệt kim') || qLower.includes('thu đông') ||
+    qLower.includes('ấm') || qLower.includes('sweater') || qLower.includes('nỉ') || intent.category === 'ao-len';
+
+  const userExplicitlyWantsAccessory = qLower.includes('phụ kiện') || qLower.includes('mũ') || qLower.includes('nón') ||
+    qLower.includes('hat') || qLower.includes('thắt lưng') || qLower.includes('belt') ||
+    qLower.includes('túi') || qLower.includes('bag') || qLower.includes('giày') || qLower.includes('sneaker');
+
+  if (userExplicitlyWantsAccessory && accessories.length > 0) {
+    if (qLower.includes('thắt lưng') || qLower.includes('belt') || intent.occasion === 'office') {
+      chosenAccessory = accessories.find((a) => a.name.toLowerCase().includes('belt') && Number(a.stockQuantity) > 0) || null;
+    } else if (qLower.includes('túi') || qLower.includes('bag')) {
+      chosenAccessory = accessories.find((a) => (a.name.toLowerCase().includes('bag') || a.name.toLowerCase().includes('tote')) && Number(a.stockQuantity) > 0) || null;
+    } else if ((qLower.includes('mũ') || qLower.includes('nón') || qLower.includes('hat')) && !isWinterOrKnit) {
+      chosenAccessory = accessories.find((a) => a.name.toLowerCase().includes('hat') && Number(a.stockQuantity) > 0) || null;
+    } else if (qLower.includes('giày') || qLower.includes('sneaker')) {
+      chosenAccessory = accessories.find((a) => a.name.toLowerCase().includes('sneaker') && Number(a.stockQuantity) > 0) || null;
     }
   }
 
@@ -786,7 +833,7 @@ Hãy quan sát kỹ bức ảnh trang phục và trích xuất các đặc đi�
   try {
     const aiText = await callGeminiApi({
       contents,
-      model: 'gemini-3.5-flash',
+      model: 'gemini-flash-latest',
       temperature: 0.2,
       responseMimeType: 'application/json',
     });

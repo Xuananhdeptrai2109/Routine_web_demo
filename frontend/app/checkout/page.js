@@ -13,6 +13,7 @@ import { useCart } from "@/context/CartContext";
 import { useCheckout } from "@/context/CheckoutContext";
 import { useUser } from "@/context/UserContext";
 import { useToast } from "@/components/common/Toast";
+import { checkAddressApi } from "@/lib/shippingService";
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -41,6 +42,23 @@ export default function CheckoutPage() {
   useEffect(() => {
     if (!address && savedAddress) {
       setAddress(savedAddress);
+      // Nếu địa chỉ lưu từ trước chưa có định vị nearestStore, tự động xác thực ngầm
+      if (!savedAddress.nearestStore && (savedAddress.address || savedAddress.city)) {
+        checkAddressApi(savedAddress)
+          .then((geo) => {
+            if (geo && geo.valid && geo.nearestStore) {
+              const enriched = {
+                ...savedAddress,
+                coordinates: geo.coordinates,
+                formattedAddress: geo.formattedAddress,
+                nearestStore: geo.nearestStore,
+              };
+              setAddress(enriched);
+              setSavedAddress(enriched);
+            }
+          })
+          .catch(() => {});
+      }
     }
     // Only run once on mount to seed from a previously saved address.
     // eslint-disable-next-line react-hooks/exhaustive-deps

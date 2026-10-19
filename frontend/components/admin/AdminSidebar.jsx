@@ -14,6 +14,7 @@ import {
   IconVouchers,
   IconReviews,
   IconSettings,
+  IconStores,
   IconHero,
   IconX,
 } from "./icons";
@@ -30,6 +31,7 @@ const ICONS = {
   vouchers: IconVouchers,
   reviews: IconReviews,
   hero: IconHero,
+  stores: IconStores,
   settings: IconSettings,
 };
 

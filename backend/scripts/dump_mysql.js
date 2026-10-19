@@ -17,22 +17,26 @@ const host = parsed.hostname || 'localhost';
 const port = parsed.port || '3306';
 const database = parsed.pathname.replace(/^\//, '');
 
-const outputFile = path.join(__dirname, '../routine_db.sql');
+const backendOutputFile = path.join(__dirname, '../Routine_db.sql');
+const rootOutputFile = path.join(__dirname, '../../Routine_db.sql');
 
-console.log(`Dumping database "${database}" from ${host}:${port} as user "${user}"...`);
+console.log(`Đang xuất dump cơ sở dữ liệu "${database}" từ ${host}:${port}...`);
 
-const cmd = `mysqldump -u ${user} -p"${password}" -h ${host} -P ${port} --default-character-set=utf8mb4 --routines --triggers --hex-blob ${database}`;
+// Dùng --result-file để ghi trực tiếp, tránh tràn RAM bộ đệm Node.js
+const cmd = `mysqldump -u ${user} -p"${password}" -h ${host} -P ${port} --default-character-set=utf8mb4 --hex-blob --routines --triggers --add-drop-table --result-file="${backendOutputFile}" ${database}`;
 
 try {
-  const dumpOutput = execSync(cmd, {
-    maxBuffer: 50 * 1024 * 1024, // 50MB buffer
-    encoding: 'utf8',
-  });
+  execSync(cmd, { stdio: 'inherit' });
 
-  fs.writeFileSync(outputFile, dumpOutput, 'utf8');
-  const stats = fs.statSync(outputFile);
-  console.log(`Successfully exported to "${outputFile}". File size: ${stats.size} bytes.`);
+  // Sao chép sang thư mục gốc để tiện lợi ở cả 2 nơi
+  fs.copyFileSync(backendOutputFile, rootOutputFile);
+
+  const stats = fs.statSync(backendOutputFile);
+  const sizeMB = (stats.size / (1024 * 1024)).toFixed(2);
+  console.log(`✅ Xuất thành công file dump Routine_db.sql:`);
+  console.log(`   - Thư mục backend: ${backendOutputFile} (${sizeMB} MB)`);
+  console.log(`   - Thư mục gốc project: ${rootOutputFile} (${sizeMB} MB)`);
 } catch (err) {
-  console.error('Dump failed:', err.message);
+  console.error('Dump thất bại:', err.message);
   process.exit(1);
 }

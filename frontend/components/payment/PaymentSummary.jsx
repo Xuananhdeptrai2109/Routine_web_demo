@@ -1,48 +1,81 @@
 "use client";
 
 import { formatPrice } from "@/lib/format";
-import { getShippingFee } from "@/lib/checkoutConstants";
+import { getShippingFee, calculateStandardShipping } from "@/lib/checkoutConstants";
 import { useCheckout } from "@/context/CheckoutContext";
 
-export default function PaymentSummary({ subtotal, shippingMethod, discount = 0, voucherCode = "", onPlaceOrder, isProcessing, error, address: propAddress }) {
+export default function PaymentSummary({
+  subtotal,
+  shippingMethod,
+  discount = 0,
+  voucherCode = "",
+  onPlaceOrder,
+  isProcessing,
+  error,
+  address: propAddress,
+}) {
   const checkout = useCheckout();
   const address = propAddress !== undefined ? propAddress : checkout?.address;
-  const shipping = getShippingFee(shippingMethod, address);
+  const shipping = getShippingFee(shippingMethod, address, subtotal);
+  const stdInfo = calculateStandardShipping(subtotal);
+  const isStandard = String(shippingMethod || "standard").toLowerCase() === "standard";
+  const hasShippingDiscount = isStandard && stdInfo.discount > 0;
   const total = Math.max(subtotal + shipping - discount, 0);
 
   return (
     <div className="payment-summary">
-      <h2 style={{ fontSize: 16, marginBottom: 20, letterSpacing: "0.04em" }}>ORDER SUMMARY</h2>
+      <h2 style={{ fontSize: 16, marginBottom: 20, letterSpacing: "0.04em" }}>TỔNG QUAN ĐƠN HÀNG</h2>
 
       <div className="payment-summary-row">
-        <span>Subtotal</span>
+        <span>Tạm tính (Subtotal)</span>
         <span>{formatPrice(subtotal)}</span>
       </div>
+
       <div className="payment-summary-row">
-        <span>Shipping</span>
-        <span>{formatPrice(shipping)}</span>
+        <span>Phí vận chuyển</span>
+        <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          {hasShippingDiscount && (
+            <span style={{ fontSize: 12, color: "#94a3b8", textDecoration: "line-through" }}>
+              {formatPrice(stdInfo.baseFee)}
+            </span>
+          )}
+          <span style={{ fontWeight: 600 }}>{shipping === 0 ? "Miễn phí" : formatPrice(shipping)}</span>
+        </span>
       </div>
+
+      {hasShippingDiscount && (
+        <div className="payment-summary-row" style={{ color: "var(--color-success)", fontSize: 13 }}>
+          <span>{stdInfo.discountNote}</span>
+          <span>-{formatPrice(stdInfo.discount)}</span>
+        </div>
+      )}
+
       {discount > 0 && (
         <div className="payment-summary-row" style={{ color: "var(--color-success)" }}>
-          <span>Discount {voucherCode ? `(${voucherCode})` : ""}</span>
+          <span>Giảm giá {voucherCode ? `(${voucherCode})` : ""}</span>
           <span>-{formatPrice(discount)}</span>
         </div>
       )}
 
       <div className="payment-summary-row payment-summary-total">
-        <span>TOTAL</span>
+        <span>TỔNG THANH TOÁN</span>
         <span>{formatPrice(total)}</span>
       </div>
 
       {error && (
         <div className="payment-error" role="alert">
-          <p style={{ fontWeight: 600, marginBottom: 4 }}>PAYMENT FAILED</p>
+          <p style={{ fontWeight: 600, marginBottom: 4 }}>THANH TOÁN THẤT BẠI</p>
           <p style={{ fontSize: 13 }}>{error}</p>
         </div>
       )}
 
-      <button className="btn btn-primary btn-full" style={{ marginTop: 20 }} onClick={onPlaceOrder} disabled={isProcessing}>
-        {isProcessing ? "Processing..." : error ? "Try Again" : "Place Order"}
+      <button
+        className="btn btn-primary btn-full"
+        style={{ marginTop: 20 }}
+        onClick={onPlaceOrder}
+        disabled={isProcessing}
+      >
+        {isProcessing ? "Đang xử lý..." : error ? "Thử lại" : "Đặt hàng"}
       </button>
 
       <style>{`

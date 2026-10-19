@@ -31,3 +31,9 @@ Thumbs.db
 
 .vercel
 .env*
+
+# Large SQL Dump files (> 100MB exceeds GitHub limit)
+Routine_db.sql
+*/Routine_db.sql
+routine_db.sql
+*/routine_db.sql

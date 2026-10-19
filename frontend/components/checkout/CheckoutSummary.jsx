@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { formatPrice } from "@/lib/format";
-import { getShippingFee } from "@/lib/checkoutConstants";
+import { getShippingFee, calculateStandardShipping } from "@/lib/checkoutConstants";
 import { useCheckout } from "@/context/CheckoutContext";
 import { useToast } from "@/components/common/Toast";
 import { validateCouponApi } from "@/lib/couponService";
@@ -29,7 +29,10 @@ export default function CheckoutSummary({
     }
   }, [voucherCode]);
 
-  const shipping = subtotal === 0 ? 0 : getShippingFee(shippingMethod, address);
+  const shipping = subtotal === 0 ? 0 : getShippingFee(shippingMethod, address, subtotal);
+  const stdInfo = calculateStandardShipping(subtotal);
+  const isStandard = String(shippingMethod || "standard").toLowerCase() === "standard";
+  const hasShippingDiscount = isStandard && stdInfo.discount > 0;
   const total = Math.max(subtotal + shipping - currentDiscount, 0);
 
   async function handleApplyVoucher(e) {
@@ -104,22 +107,35 @@ export default function CheckoutSummary({
       )}
 
       <div className="checkout-summary-row">
-        <span>Subtotal</span>
+        <span>Tạm tính (Subtotal)</span>
         <span>{formatPrice(subtotal)}</span>
       </div>
       <div className="checkout-summary-row">
-        <span>Shipping</span>
-        <span>{formatPrice(shipping)}</span>
+        <span>Phí vận chuyển</span>
+        <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          {hasShippingDiscount && (
+            <span style={{ fontSize: 12, color: "#94a3b8", textDecoration: "line-through" }}>
+              {formatPrice(stdInfo.baseFee)}
+            </span>
+          )}
+          <span style={{ fontWeight: 600 }}>{shipping === 0 ? "Miễn phí" : formatPrice(shipping)}</span>
+        </span>
       </div>
+      {hasShippingDiscount && (
+        <div className="checkout-summary-row" style={{ color: "var(--color-success)", fontSize: 13 }}>
+          <span>{stdInfo.discountNote}</span>
+          <span>-{formatPrice(stdInfo.discount)}</span>
+        </div>
+      )}
       {currentDiscount > 0 && (
         <div className="checkout-summary-row" style={{ color: "var(--color-success)" }}>
-          <span>Discount ({voucherCode || "Voucher"})</span>
+          <span>Giảm giá ({voucherCode || "Voucher"})</span>
           <span>-{formatPrice(currentDiscount)}</span>
         </div>
       )}
 
       <div className="checkout-summary-row checkout-summary-total">
-        <span>TOTAL</span>
+        <span>TỔNG CỘNG</span>
         <span>{formatPrice(total)}</span>
       </div>
 

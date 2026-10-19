@@ -34,6 +34,10 @@ export const NAV_SECTIONS = [
     ],
   },
   {
+    section: "OPERATIONS",
+    items: [{ label: "Stores", href: "/admin/stores", icon: "stores" }],
+  },
+  {
     section: "SYSTEM",
     items: [{ label: "Settings", href: "/admin/settings", icon: "settings" }],
   },

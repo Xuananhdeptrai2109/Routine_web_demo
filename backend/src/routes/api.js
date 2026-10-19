@@ -21,6 +21,8 @@ const mediaRoutes = require('./mediaRoutes');
 const settingRoutes = require('./settingRoutes');
 const paymentRoutes = require('./paymentRoutes');
 const analyticsRoutes = require('./analyticsRoutes');
+const storeRoutes = require('./storeRoutes');
+const shippingRoutes = require('./shippingRoutes');
 const { sendSuccess } = require('../utils/response');
 
 // Health-check endpoint
@@ -64,5 +66,7 @@ router.use('/uploads', mediaRoutes); // Alias tương thích ngược
 router.use('/settings', settingRoutes);
 router.use('/payment', paymentRoutes);
 router.use('/analytics', analyticsRoutes);
+router.use('/stores', storeRoutes);
+router.use('/shipping', shippingRoutes);
 
 module.exports = router;

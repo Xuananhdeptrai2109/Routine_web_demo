@@ -224,38 +224,143 @@ export function getShippingTier(address) {
 }
 
 /**
- * Lấy danh sách phương thức vận chuyển với phí cập nhật theo địa chỉ
+ * Tính mức giảm giá tiền ship Standard (Viettel Post giá gốc 30.000đ)
+ * - Đơn từ 700k: giảm 20% tối đa 15k tiền ship (giảm 6k -> còn 24k)
+ * - Đơn từ 1.000k (1tr): giảm 30% tối đa 50k tiền ship (giảm 9k -> còn 21k)
+ * - Đơn từ 1.500k (1.5tr): giảm 50% tối đa 50k tiền ship (giảm 15k -> còn 15k)
  */
-export function getShippingMethods(address = null) {
-  const tier = getShippingTier(address);
-  const info = SHIPPING_RATES[tier] || SHIPPING_RATES.tier1;
+export function calculateStandardShipping(subtotal = 0) {
+  const baseFee = 30000;
+  const sub = Number(subtotal) || 0;
+  let discount = 0;
+  let discountNote = "";
 
+  if (sub >= 1500000) {
+    discount = Math.min(Math.round(baseFee * 0.5), 50000); // 15.000đ
+    discountNote = "Giảm 50% tiền ship (Đơn từ 1.500.000đ)";
+  } else if (sub >= 1000000) {
+    discount = Math.min(Math.round(baseFee * 0.3), 50000); // 9.000đ
+    discountNote = "Giảm 30% tiền ship (Đơn từ 1.000.000đ)";
+  } else if (sub >= 700000) {
+    discount = Math.min(Math.round(baseFee * 0.2), 15000); // 6.000đ
+    discountNote = "Giảm 20% tiền ship (Đơn từ 700.000đ)";
+  }
+
+  const finalFee = Math.max(0, baseFee - discount);
   return {
-    standard: {
-      id: "standard",
-      label: "Standard Delivery",
-      fee: info.standard,
-      eta: info.etaStandard,
-      zoneName: info.name
-    },
-    express: {
-      id: "express",
-      label: "Express Delivery",
-      fee: info.express,
-      eta: info.etaExpress,
-      zoneName: info.name
-    }
+    baseFee,
+    discount,
+    discountNote,
+    finalFee,
   };
 }
 
 /**
- * Tính phí giao hàng theo phương thức và địa chỉ (tính từ gốc Quận 1, HCM)
+ * Tính cước Ship Hỏa Tốc (Nhân viên showroom đi ship):
+ * - Điều kiện: Khoảng cách < 30km so với showroom gần nhất
+ * - < 5km: Miễn phí (0đ)
+ * - 5km - 10km: 50.000đ
+ * - 10km - 20km: 70.000đ
+ * - 20km - 30km: 100.000đ
+ * - >= 30km: Không khả dụng
  */
-export function getShippingFee(methodId = "standard", address = null) {
-  const method = String(methodId || "standard").toLowerCase() === "express" ? "express" : "standard";
-  const tier = getShippingTier(address);
-  const info = SHIPPING_RATES[tier] || SHIPPING_RATES.tier1;
-  return info[method];
+export function calculateExpressShipping(distanceKm = null, nearestStore = null) {
+  const dist = distanceKm !== null && distanceKm !== undefined ? Number(distanceKm) : null;
+
+  if (dist === null) {
+    return {
+      available: false,
+      fee: 0,
+      isFree: false,
+      distanceKm: null,
+      reason: "Vui lòng nhập và xác thực địa chỉ để tính khoảng cách.",
+    };
+  }
+
+  if (dist >= 30) {
+    return {
+      available: false,
+      fee: 100000,
+      isFree: false,
+      distanceKm: dist,
+      reason: `Khoảng cách ${dist} km vượt quá bán kính hỗ trợ hỏa tốc 30 km từ ${nearestStore?.name || "cửa hàng"}.`,
+    };
+  }
+
+  let fee = 0;
+  let isFree = false;
+  let reason = "";
+
+  if (dist < 5) {
+    fee = 0;
+    isFree = true;
+    reason = "Miễn phí hỏa tốc (< 5km từ cửa hàng)";
+  } else if (dist < 10) {
+    fee = 50000;
+  } else if (dist < 20) {
+    fee = 70000;
+  } else {
+    fee = 100000;
+  }
+
+  return {
+    available: true,
+    fee,
+    isFree,
+    distanceKm: dist,
+    reason,
+  };
+}
+
+/**
+ * Lấy danh sách phương thức vận chuyển với phí cập nhật theo địa chỉ và giá trị giỏ hàng
+ */
+export function getShippingMethods(address = null, subtotal = 0) {
+  const std = calculateStandardShipping(subtotal);
+  const dist = address?.nearestStore?.distanceKm ?? null;
+  const store = address?.nearestStore ?? null;
+  const exp = calculateExpressShipping(dist, store);
+
+  return {
+    standard: {
+      id: "standard",
+      label: "Ship Tiêu Chuẩn (Viettel Post)",
+      provider: "Viettel Post",
+      baseFee: std.baseFee,
+      discount: std.discount,
+      discountNote: std.discountNote,
+      fee: std.finalFee,
+      eta: "2–4 ngày làm việc",
+      available: true,
+    },
+    express: {
+      id: "express",
+      label: "Ship Hỏa Tốc (Nhân viên cửa hàng)",
+      provider: store?.name ? `Showroom Routine ${store.name}` : "Showroom Routine",
+      fee: exp.fee,
+      isFree: exp.isFree,
+      eta: "Giao ngay trong 1–2 giờ",
+      available: exp.available,
+      reason: exp.reason,
+      distanceKm: exp.distanceKm,
+      nearestStore: store,
+    },
+  };
+}
+
+/**
+ * Tính phí giao hàng theo phương thức, địa chỉ và giá trị giỏ hàng
+ */
+export function getShippingFee(methodId = "standard", address = null, subtotal = 0) {
+  const isExp = String(methodId || "standard").toLowerCase() === "express";
+  if (isExp) {
+    const dist = address?.nearestStore?.distanceKm ?? null;
+    const store = address?.nearestStore ?? null;
+    const exp = calculateExpressShipping(dist, store);
+    return exp.fee;
+  }
+  const std = calculateStandardShipping(subtotal);
+  return std.finalFee;
 }
 
 export const PAYMENT_METHODS = [

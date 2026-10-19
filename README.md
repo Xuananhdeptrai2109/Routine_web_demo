@@ -14,6 +14,7 @@
    - [3.4 Hệ thống Đánh giá & Phân quyền Sản phẩm (Reviews & Ratings)](#34-hệ-thống-đánh-giá--phân-quyền-sản-phẩm-reviews--ratings)
    - [3.5 Cổng Quản trị Vận hành Toàn diện (Admin Portal)](#35-cổng-quản-trị-vận-hành-toàn-diện-admin-portal)
    - [3.6 Cơ chế Kỹ thuật Chuyên sâu & Bảo mật](#36-cơ-chế-kỹ-thuật-chuyên-sâu--bảo-mật)
+   - [3.7 Không gian Vector ChromaDB & Đóng khung AI (RAG Grounding)](#37-không-gian-vector-chromadb--đóng-khung-ai-rag-grounding)
 4. [Tài khoản Demo thử nghiệm (Demo Credentials)](#4-tài-khoản-demo-thử-nghiệm-demo-credentials)
 5. [Cấu trúc thư mục dự án](#5-cấu-trúc-thư-mục-dự-án)
 6. [Yêu cầu môi trường (Prerequisites)](#6-yêu-cầu-môi-trường-prerequisites)
@@ -21,6 +22,7 @@
    - [Bước 1: Thiết lập Cơ sở dữ liệu (MySQL)](#bước-1-thiết-lập-cơ-sở-dữ-liệu-mysql)
    - [Bước 2: Cài đặt & Cấu hình Backend](#bước-2-cài-đặt--cấu-hình-backend)
    - [Bước 3: Cài đặt & Cấu hình Frontend](#bước-3-cài-đặt--cấu-hình-frontend)
+   - [Bước 4: Cài đặt & Khởi tạo AI Vector Service](#bước-4-cài-đặt--khởi-tạo-ai-vector-service)
 8. [Cách khởi chạy dự án (How to Run)](#8-cách-khởi-chạy-dự-án-how-to-run)
 9. [Tài liệu API Endpoints Chi tiết](#9-tài-liệu-api-endpoints-chi-tiết)
 10. [Chạy các kịch bản kiểm thử tự động (Automated Tests)](#10-chạy-các-kịch-bản-kiểm-thử-tự-động-automated-tests)
@@ -46,6 +48,7 @@ graph TD
     Client["Client (Trình duyệt Web - Máy tính & Di động)"]
     FE["Frontend (Next.js 14 App Router) - Port 3000"]
     BE["Backend (Express.js REST API) - Port 5001"]
+    AI["AI Vector Service (Python / ChromaDB / PCA) - Port 8008"]
     DB[("MySQL Database (routine_db)")]
     Prisma["Prisma ORM 6"]
     Gemini["Google Gemini AI (gemini-flash-lite-latest)"]
@@ -59,6 +62,8 @@ graph TD
     Prisma -->|Query / Transaction| DB
     BE -->|Intent & Multi-turn Chat| Gemini
     BE -->|Local Semantic Parser & Fallback| Thesaurus
+    BE -->|Vector Search & RAG Grounding| AI
+    DB -->|ETL Vectorization| AI
     BE -->|HMAC-SHA512 Payment & Return| VNPay
     BE -->|OTP & Order Invoices| SMTP
 ```
@@ -75,10 +80,14 @@ graph TD
 | | **Database** | MySQL 8.0 | Lưu trữ bền vững dữ liệu sản phẩm, đơn hàng, tồn kho, khách hàng và tracking. |
 | **Trí tuệ nhân tạo (AI)** | **Google Gemini AI** | REST API | Model `gemini-flash-lite-latest` phản hồi siêu tốc (~2s), trích xuất ý định và sinh lời khuyên thời trang. |
 | | **Fashion Thesaurus** | Thuần JS | Bộ từ điển từ đồng nghĩa thời trang tiếng Việt độc quyền, chuẩn hóa từ ngữ tự nhiên về SQL query. |
+| **Vector DB & RAG** | **ChromaDB** | 0.5.x | Lưu trữ Embeddings bền vững của 128 sản phẩm, tính toán khoảng cách Cosine Similarity. |
+| | **Python & FastAPI** | 3.12 / 0.115 | Microservice tại Port `8008` phục vụ tìm kiếm vector ngữ nghĩa và RAG Grounding. |
+| | **Scikit-learn (PCA)**| 1.5.x | Thuật toán PCA giảm chiều vector về mặt phẳng 2D `(x, y)` trực quan hóa biểu đồ phân bố sản phẩm. |
 | **Thanh toán & Bảo mật**| **VNPay Sandbox** | `vnpay` 2.5.0 | Thanh toán online an toàn qua VNPAY-QR, Thẻ ATM/Nội địa và Thẻ quốc tế. |
 | | **JWT & Bcryptjs** | JWT 9.0 | Xác thực phân quyền `CUSTOMER` / `ADMIN`, hash mật khẩu an toàn. |
 | | **Helmet & Rate Limit**| Helmet 8.3 | Chống tấn công DDoS, bảo vệ Header HTTP và giới hạn 25 req/phút cho luồng AI. |
 | **Truyền thông** | **Nodemailer** | 10.0.1 | Gửi mã OTP đăng ký / quên mật khẩu và email hóa đơn đơn hàng chuyên nghiệp. |
+
 
 ---
 
@@ -150,6 +159,23 @@ Truy cập tại: `http://localhost:3000/admin`
 
 ---
 
+### 3.7 Không gian Vector ChromaDB & Đóng khung AI (RAG Grounding)
+Phân hệ microservice độc lập tại thư mục `ai_vector_service/` (chạy trên cổng `8008`) bổ trợ khả năng hiểu sâu và trực quan hóa kho hàng thời trang:
+
+1. **Chuyển hóa dữ liệu SQL sang Vector Embeddings**:
+   - Trích xuất 128 sản phẩm từ MySQL `routine_db`, tự động nhận diện mùa vụ (`quần áo thu đông, giữ ấm` vs `thời trang xuân hè, thoáng mát`) dựa trên từ khóa ngữ nghĩa và lưu trữ bền vững vào **ChromaDB** (`chroma_storage`).
+2. **Giảm chiều dữ liệu PCA (Tọa độ điểm 2D)**:
+   - Áp dụng thuật toán **PCA (Principal Component Analysis)** giảm chiều không gian vector embeddings đa chiều về 2 tọa độ `(x, y)` chuẩn hóa trong khoảng `[-10, 10]`.
+   - Mỗi sản phẩm trở thành một điểm tọa độ trong không gian, được lưu cache tại `coords_2d.json` để truy xuất tức thì.
+3. **Kỹ thuật "Đóng khung con AI" (RAG Grounding)**:
+   - Khi khách hàng tìm kiếm hoặc hỏi tư vấn (*"quần short kaki mùa hè"*, *"áo sơ mi trắng công sở"*), hệ thống tính khoảng cách Cosine trong ChromaDB và trích xuất Top 3-5 sản phẩm gần nhất.
+   - Danh sách sản phẩm này được đưa vào System Prompt bắt buộc: **AI chỉ được phép tư vấn dựa trên đúng những sản phẩm đang có trong kho, tuyệt đối không bịa đặt sản phẩm ngoài danh mục.**
+4. **Giao diện Trực quan hóa Không gian Vector 2D**:
+   - Truy cập: `http://localhost:8008/visualization/view`
+   - Biểu đồ trực quan Canvas/Chart.js hiển thị 128 chấm tròn tương ứng với 128 sản phẩm Routine; khi người dùng tìm kiếm từ khóa, các sản phẩm phù hợp nhất sẽ tự động phát sáng và hiển thị lời tư vấn đóng khung từ AI Stylist.
+
+---
+
 ## 4. Tài khoản Demo thử nghiệm (Demo Credentials)
 
 Hệ thống đã có sẵn các tài khoản mẫu trong cơ sở dữ liệu `routine_db.sql`:
@@ -202,6 +228,17 @@ Routine_web/
 │   ├── lib/                             # Client API fetchers: api.js, aiStylistService.js...
 │   └── public/                          # Ảnh sản phẩm, icons, banners
 │
+├── ai_vector_service/                   # Microservice Vector ChromaDB & RAG Stylist (Python)
+│   ├── main.py                          # Server FastAPI (Port 8008), các endpoints /search, /rag/ask, /visualization
+│   ├── app.py                           # Phiên bản All-in-one chạy dòng lệnh CLI tương tác trực tiếp
+│   ├── chroma_manager.py                # Đọc MySQL -> Sinh Embeddings -> Lưu ChromaDB -> PCA 2D
+│   ├── rag_agent.py                     # Đóng khung AI Stylist với Google Gemini + Fallback Local
+│   ├── config.py                        # Đọc cấu hình MySQL, Gemini API, Chroma persistence dir
+│   ├── test_client.py                   # Client kiểm thử tự động API microservice
+│   ├── run.bat                          # File thực thi khởi chạy nhanh server port 8008 trên Windows
+│   └── chroma_storage/                  # Thư mục lưu trữ bền vững Vector & cache tọa độ coords_2d.json
+│
+├── run_all.bat                          # Script 1-click khởi chạy đồng thời cả 3 dịch vụ
 └── README.md                            # Tài liệu hướng dẫn toàn diện dự án
 ```
 
@@ -211,6 +248,7 @@ Routine_web/
 
 - **Node.js**: Phiên bản `>= 18.x` (khuyến nghị Node 20 hoặc 22 LTS). Kiểm tra: `node -v`
 - **npm**: Phiên bản `>= 9.x`. Kiểm tra: `npm -v`
+- **Python**: Phiên bản `>= 3.10` (khuyến nghị Python 3.12). Kiểm tra: `python --version`
 - **MySQL Server**: Phiên bản `>= 8.0` (chạy qua XAMPP, Laragon, MySQL Installer hoặc Docker).
 - Trình duyệt hiện đại: Chrome, Edge, Safari hoặc Firefox.
 
@@ -300,11 +338,36 @@ Routine_web/
 
 ---
 
+### Bước 4: Cài đặt & Khởi tạo AI Vector Service (Python)
+1. Mở Terminal di chuyển vào thư mục `ai_vector_service`:
+   ```bash
+   cd ai_vector_service
+   ```
+2. Cài đặt các thư viện Python:
+   ```bash
+   pip install chromadb pymysql numpy scikit-learn fastapi uvicorn requests python-dotenv
+   ```
+3. Cấu hình file `config.py` (mặc định service sẽ tự động đọc biến môi trường từ `backend/.env`):
+   - `DATABASE_URL`: Kết nối MySQL chứa bảng `products`.
+   - `GEMINI_API_KEY`: API key của Google Gemini để kích hoạt RAG Stylist.
+   - `AI_SERVICE_PORT`: Mặc định chạy tại port `8008`.
+
+---
+
 ## 8. Cách khởi chạy dự án (How to Run)
 
-Khởi động **2 Terminal song song**:
+### Cách 1: Khởi chạy 1-Click tự động (Khuyến nghị trên Windows)
+Click đúp chuột vào file:
+```
+run_all.bat
+```
+> Hệ thống sẽ tự động mở 3 cửa sổ Terminal độc lập cho **Backend (5001)**, **Frontend (3000)** và **AI Vector Service (8008)**.
 
-### Terminal 1: Chạy Backend
+---
+
+### Cách 2: Khởi chạy thủ công với 3 Terminal song song
+
+#### Terminal 1: Chạy Backend (API Server)
 ```bash
 cd backend
 npm start
@@ -312,19 +375,31 @@ npm start
 - Server chạy tại: **`http://localhost:5001`**
 - Kiểm tra Health-check: `http://localhost:5001/api/v1/health`
 
-### Terminal 2: Chạy Frontend
+#### Terminal 2: Chạy Frontend (Storefront & Admin)
 ```bash
 cd frontend
 npm run dev
 ```
 - Trang web hoạt động tại: **`http://localhost:3000`**
 
+#### Terminal 3: Chạy AI ChromaDB Vector & RAG Microservice
+```bash
+cd ai_vector_service
+python main.py
+# hoặc click đúp file: ai_vector_service\run.bat
+```
+- Vector Service hoạt động tại: **`http://localhost:8008`**
+- Giao diện trực quan hóa Vector 2D: **`http://localhost:8008/visualization/view`**
+
+---
+
 ### Các trang chính cần trải nghiệm:
 - **Trang chủ Storefront**: `http://localhost:3000`
 - **Trợ lý AI Stylist Chatbot**: `http://localhost:3000/smart-outfit/ai-stylist`
 - **Bộ sưu tập Smart Outfit**: `http://localhost:3000/smart-outfit`
+- **Không gian Tọa độ Vector AI 2D**: `http://localhost:8008/visualization/view`
 - **Giỏ hàng**: `http://localhost:3000/cart`
-- **Cổng Quản trị Admin**: `http://localhost:3000/admin` (Đăng nhập: `admin@routine.vn` / `Admin@123`)
+- **Cổng Quản trị Admin**: `http://localhost:3000/admin` (Đăng nhập: `admin_new@routine.vn` / `Admin@123456`)
 
 ---
 
@@ -376,8 +451,21 @@ Tất cả các endpoint đều có tiền tố `/api/v1`:
 | | `POST` | `/api/v1/coupons/apply` | Áp dụng voucher kiểm tra giảm giá |
 | **Thanh toán VNPay** | `POST` | `/api/v1/payment/vnpay/create-payment-url` | Sinh link thanh toán VNPay Sandbox |
 | | `GET` | `/api/v1/payment/vnpay/vnpay-return` | Xử lý phản hồi kết quả giao dịch VNPay |
+| **Tìm kiếm Vector (Backend)** | `POST` | `/api/v1/search/vector` | Tìm kiếm ngữ nghĩa qua ChromaDB kết nối port 8008 |
+| | `POST` | `/api/v1/search/rag` | Hỏi AI Stylist đóng khung RAG qua Backend bridge |
 | **Quản trị (Admin)** | `POST/PUT/DELETE` | `/api/v1/products` *(Admin)* | CRUD sản phẩm trong kho |
 | | `PATCH` | `/api/v1/orders/:id/status` | Cập nhật trạng thái duyệt/giao đơn hàng |
+
+#### Endpoints Microservice AI Vector & RAG (`http://localhost:8008`):
+
+| Phương thức | Endpoint | Mô tả |
+| :---: | :--- | :--- |
+| `GET` | `/` | Kiểm tra tình trạng Microservice, số lượng vector hiện có |
+| `POST` | `/sync` | Đồng bộ toàn bộ dữ liệu bảng `products` từ MySQL sang ChromaDB |
+| `POST` | `/search` | Tìm kiếm sản phẩm tương đồng nhất theo vector từ khóa (`{"query": "...", "limit": 5}`) |
+| `POST` | `/rag/ask` | Đóng khung AI Stylist với RAG và trả lời tư vấn (`{"keyword": "...", "limit": 4}`) |
+| `GET` | `/visualization/points` | Lấy danh sách tọa độ 2 chiều `(x, y)` của tất cả sản phẩm trong kho |
+| `GET` | `/visualization/view` | Trang HTML biểu đồ trực quan hóa không gian tọa độ 2D của kho sản phẩm |
 
 ---
 
@@ -410,13 +498,24 @@ node test_vnpay_api.js
 node test_backend_consistency.js
 ```
 
+Kiểm thử Microservice AI Vector & RAG (`ai_vector_service/`):
+```bash
+cd ai_vector_service
+
+# 1. Kiểm tra toàn bộ luồng chuyển đổi Vector, tìm kiếm và đóng khung AI (CLI)
+python test_client.py
+
+# 2. Hoặc chạy chế độ tương tác gõ từ khóa trực tiếp
+python app.py
+```
+
 ---
 
 ## 11. Khắc phục sự cố thường gặp (Troubleshooting)
 
-### 1. Lỗi cổng `5001` hoặc `3000` bị chiếm dụng (Port in use)
+### 1. Lỗi cổng `5001`, `3000` hoặc `8008` bị chiếm dụng (Port in use)
 - **Xử lý**:
-  - Mở PowerShell và chạy lệnh tìm PID: `netstat -ano | findstr :5001`
+  - Mở PowerShell và chạy lệnh tìm PID: `netstat -ano | findstr :5001` (hoặc `:3000`, `:8008`)
   - Dừng tiến trình bằng: `taskkill /PID <PID> /F`
 
 ### 2. Lỗi `PrismaClientInitializationError: Can't reach database server`
@@ -424,10 +523,11 @@ node test_backend_consistency.js
 
 ### 3. Lỗi Gemini API báo 429 hoặc treo phản hồi
 - **Nguyên nhân**: Tài khoản Google AI Studio miễn phí có giới hạn số lượt gọi/phút.
-- **Xử lý**: Hệ thống đã được tích hợp model siêu nhẹ `gemini-flash-lite-latest` và cơ chế **Fast-Failover**. Nếu API Google bận hoặc hết hạn mức, backend tự động chuyển sang phân tích thông minh cục bộ (`fashionThesaurus.js`) trong **0.005 giây** mà không làm treo ứng dụng.
+- **Xử lý**: Hệ thống đã được tích hợp model siêu nhẹ `gemini-flash-lite-latest` và cơ chế **Fast-Failover**. Nếu API Google bận hoặc hết hạn mức, backend và RAG agent tự động chuyển sang phân tích thông minh cục bộ (`fashionThesaurus.js` / Fallback Local) trong **0.005 giây** mà không làm treo ứng dụng.
 
 ### 4. Lỗi hiển thị ảnh tải lên (404 khi xem ảnh)
 - **Xử lý**: File `frontend/next.config.js` đã thiết lập proxy rewrite `/uploads/:path*` trỏ trực tiếp sang `http://localhost:5001/uploads/:path*`. Đảm bảo backend đang bật và thư mục `backend/public/uploads` có chứa ảnh tương ứng.
+
 
 ---
 
