@@ -1,9 +1,25 @@
 // Routine API Client
-const RAW_API_BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001').replace(/\/+$/, '');
-const API_BASE = RAW_API_BASE.endsWith('/api/v1') ? RAW_API_BASE : `${RAW_API_BASE}/api/v1`;
+function getApiBase() {
+  if (typeof window !== 'undefined') {
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const envBase = (process.env.NEXT_PUBLIC_API_URL || '').trim().replace(/\/+$/, '');
+    // Trên Vercel / Production: nếu chưa cấu hình hoặc trỏ nhầm localhost, dùng relative /api/v1
+    if (!isLocal && (!envBase || envBase.includes('localhost') || envBase.includes('127.0.0.1'))) {
+      return '/api/v1';
+    }
+    if (envBase) {
+      return envBase.endsWith('/api/v1') ? envBase : `${envBase}/api/v1`;
+    }
+    return isLocal ? 'http://localhost:5001/api/v1' : '/api/v1';
+  }
+
+  const raw = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001').trim().replace(/\/+$/, '');
+  return raw.endsWith('/api/v1') ? raw : `${raw}/api/v1`;
+}
 
 export async function fetchApi(endpoint, options = {}) {
-  const url = `${API_BASE}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+  const apiBase = getApiBase();
+  const url = `${apiBase}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
   
   const headers = {
     'Content-Type': 'application/json',
