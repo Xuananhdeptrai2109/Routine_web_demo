@@ -9,16 +9,16 @@ const nextConfig = {
     unoptimized: true,
   },
   async rewrites() {
-    return [
-      {
-        source: '/api/v1/media/:path*',
-        destination: `${RAW_BACKEND}/api/v1/media/:path*`,
-      },
-      {
-        source: '/uploads/:path*',
-        destination: `${RAW_BACKEND}/api/v1/media/:path*`,
-      },
-    ];
+    // Chỉ rewrite sang backend ngoài khi RAW_BACKEND là URL tuyệt đối (vd: http://localhost:5001)
+    if (RAW_BACKEND && /^https?:\/\//.test(RAW_BACKEND)) {
+      return [
+        {
+          source: '/api/v1/media/:path*',
+          destination: `${RAW_BACKEND}/api/v1/media/:path*`,
+        },
+      ];
+    }
+    return [];
   },
 };
 
