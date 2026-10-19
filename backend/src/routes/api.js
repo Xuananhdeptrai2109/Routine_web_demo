@@ -26,14 +26,34 @@ const shippingRoutes = require('./shippingRoutes');
 const { sendSuccess } = require('../utils/response');
 
 // Health-check endpoint
-router.get('/health', (req, res) => {
+router.get('/health', async (req, res) => {
+  let dbStatus = 'disconnected';
+  let productCount = 0;
+  let currentDb = null;
+  let dbError = null;
+
+  try {
+    const prisma = require('../config/prisma');
+    const dbResult = await prisma.$queryRawUnsafe('SELECT DATABASE() as current_db');
+    currentDb = dbResult?.[0]?.current_db || null;
+    productCount = await prisma.product.count();
+    dbStatus = 'connected';
+  } catch (err) {
+    dbStatus = 'error';
+    dbError = err.message;
+  }
+
   return sendSuccess(
     res,
     {
       status: 'healthy',
+      dbStatus,
+      currentDb,
+      productCount,
+      dbError,
       timestamp: new Date().toISOString(),
       service: 'Routine Web API',
-      version: '1.4.0',
+      version: '1.4.1',
     },
     'Routine Web Backend is operational'
   );
